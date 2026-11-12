@@ -8,6 +8,8 @@ import Home from './pages/Home'
 import Play from './pages/Play'
 import Search from './pages/Search'
 import Browse from './pages/Browse'
+import Library from './pages/Library'
+import NewCollection from './pages/NewCollection'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -18,6 +20,8 @@ createRoot(document.getElementById('root')!).render(
           <Route path="search" element={<Search />} />
           <Route path="platform/:slug" element={<Browse kind="platform" />} />
           <Route path="genre/:slug" element={<Browse kind="genre" />} />
+          <Route path="library" element={<Library />} />
+          <Route path="library/new" element={<NewCollection />} />
           <Route path="play/:id" element={<Play />} />
           <Route path="*" element={<ComingSoon />} />
         </Route>
