@@ -9,6 +9,7 @@ import { GameDetails, GamePlayer } from './pages/game/GamePages'
 import Search from './pages/Search'
 import Browse from './pages/Browse'
 import Library from './pages/Library'
+import Profile from './pages/Profile'
 import NewCollection from './pages/NewCollection'
 import CommunityList from './pages/community/CommunityList'
 import NewPost from './pages/community/NewPost'
@@ -29,6 +30,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="community/:section" element={<CommunityList />} />
           <Route path="community/:section/new" element={<NewPost />} />
           <Route path="community/:section/:id" element={<PostDetail />} />
+          <Route path="profile" element={<Profile />} />
           <Route path="games/:id" element={<GameDetails />} />
           <Route path="games/:id/play" element={<GamePlayer />} />
           <Route path="*" element={<ComingSoon />} />
