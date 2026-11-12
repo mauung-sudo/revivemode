@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Player</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #000; }
+      #game { width: 100%; height: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="game"></div>
+    <script>
+      // TODO(before launch): self-host EmulatorJS data on R2 and pin a version.
+      const EJS_CDN = 'https://cdn.emulatorjs.org/stable/data/'
+      const params = new URLSearchParams(location.search)
+      const url = params.get('url') || ''
+      // Only same-origin game URLs: bundled files, or blob: URLs created by the parent page.
+      const allowed = url.startsWith('/') && !url.startsWith('//') || url.startsWith('blob:' + location.origin + '/')
+      if (!allowed) {
+        document.body.textContent = 'Invalid game URL.'
+        document.body.style.color = '#fff'
+      } else {
+        window.EJS_player = '#game'
+        window.EJS_core = params.get('core')
+        window.EJS_gameUrl = url
+        window.EJS_gameName = params.get('name') || 'game'
+        window.EJS_pathtodata = EJS_CDN
+        window.EJS_color = '#7c5cff'
+        window.EJS_startOnLoaded = true
+        const s = document.createElement('script')
+        s.src = EJS_CDN + 'loader.js'
+        document.body.appendChild(s)
+      }
+    </script>
+  </body>
+</html>

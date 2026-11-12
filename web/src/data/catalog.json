@@ -1,0 +1,12 @@
+[
+  {
+    "id": "test-pattern",
+    "title": "Test Pattern",
+    "system": "nes",
+    "file": "/games/test-pattern.nes",
+    "year": 2026,
+    "author": "ReviveMode",
+    "license": "CC0-1.0",
+    "description": "A 24 KB NES ROM that fills the screen with blue. Used to smoke-test the emulator pipeline."
+  }
+]
