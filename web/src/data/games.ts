@@ -1,7 +1,7 @@
 // Mock catalog used by the UI until the backend exists (see docs/BACKEND.md).
 // These are the titles shown in the Figma design. They are commercial games,
 // so they have no playable file here: "Play" asks the user to load their own copy.
-// Playable homebrew lives in catalog.json.
+// Playable homebrew sets `file` + `license` (e.g. test-pattern).
 
 export type Platform = 'NES' | 'SNES' | 'Sega Genesis' | 'PSX' | 'Neo Geo' | 'Game Boy' | 'Arcade' | 'Atari'
 export type Genre = 'Action' | 'Adventure' | 'Fighting' | 'Platformer' | 'Shooter' | 'Puzzle' | 'Racing' | 'RPG'
@@ -14,6 +14,10 @@ export interface MockGame {
   year: number
   cover: string
   players: number
+  /** Redistributable ROM bundled with the site (homebrew only). */
+  file?: string
+  /** License of the bundled file. Required when `file` is set. */
+  license?: string
 }
 
 const c = (f: string) => `/assets/covers/${f}`
@@ -51,6 +55,7 @@ export const GAMES: MockGame[] = [
   { id: 'marvel-vs-capcom', title: 'Marvel vs. Capcom', platform: 'Arcade', genre: 'Fighting', year: 1998, cover: c('marvel-vs-capcom.webp'), players: 2 },
   { id: 'soulcalibur', title: 'Soulcalibur', platform: 'Arcade', genre: 'Fighting', year: 1998, cover: c('soulcalibur.webp'), players: 2 },
   { id: 'samurai-shodown', title: 'Samurai Shodown II', platform: 'Neo Geo', genre: 'Fighting', year: 1994, cover: c('samurai-shodown.webp'), players: 2 },
+  { id: 'test-pattern', title: 'Test Pattern', platform: 'NES', genre: 'Puzzle', year: 2026, cover: c('test-pattern.webp'), players: 1, file: '/games/test-pattern.nes', license: 'CC0-1.0' },
   { id: 'darkstalkers', title: 'Darkstalkers', platform: 'Arcade', genre: 'Fighting', year: 1994, cover: c('darkstalkers.webp'), players: 2 },
 ]
 

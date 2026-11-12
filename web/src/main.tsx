@@ -5,7 +5,7 @@ import './index.css'
 import Layout from './components/Layout'
 import ComingSoon from './pages/ComingSoon'
 import Home from './pages/Home'
-import Play from './pages/Play'
+import { GameDetails, GamePlayer } from './pages/game/GamePages'
 import Search from './pages/Search'
 import Browse from './pages/Browse'
 import Library from './pages/Library'
@@ -22,7 +22,8 @@ createRoot(document.getElementById('root')!).render(
           <Route path="genre/:slug" element={<Browse kind="genre" />} />
           <Route path="library" element={<Library />} />
           <Route path="library/new" element={<NewCollection />} />
-          <Route path="play/:id" element={<Play />} />
+          <Route path="games/:id" element={<GameDetails />} />
+          <Route path="games/:id/play" element={<GamePlayer />} />
           <Route path="*" element={<ComingSoon />} />
         </Route>
       </Routes>

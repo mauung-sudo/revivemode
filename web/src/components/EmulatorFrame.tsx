@@ -4,20 +4,22 @@ interface Props {
   core: string
   gameUrl: string
   gameName: string
+  /** Fill the parent instead of drawing the default framed 4:3 box. */
+  bare?: boolean
 }
 
-export default function EmulatorFrame({ core, gameUrl, gameName }: Props) {
+export default function EmulatorFrame({ core, gameUrl, gameName, bare = false }: Props) {
   const params = new URLSearchParams({ core, url: gameUrl, name: gameName }).toString()
-  return (
-    <div className="aspect-[4/3] w-full overflow-hidden rounded-xl border border-border bg-black">
-      <iframe
-        key={params}
-        src={`/player.html?${params}`}
-        title={gameName}
-        className="h-full w-full"
-        allow="autoplay; fullscreen; gamepad"
-        allowFullScreen
-      />
-    </div>
+  const frame = (
+    <iframe
+      key={params}
+      src={`/player.html?${params}`}
+      title={gameName}
+      className={bare ? 'absolute inset-0 size-full' : 'h-full w-full'}
+      allow="autoplay; fullscreen; gamepad"
+      allowFullScreen
+    />
   )
+  if (bare) return frame
+  return <div className="aspect-[4/3] w-full overflow-hidden rounded-xl border border-neutral-600 bg-black">{frame}</div>
 }
