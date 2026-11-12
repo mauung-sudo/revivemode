@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import './index.css'
 import Layout from './components/Layout'
 import ComingSoon from './pages/ComingSoon'
@@ -10,6 +10,9 @@ import Search from './pages/Search'
 import Browse from './pages/Browse'
 import Library from './pages/Library'
 import NewCollection from './pages/NewCollection'
+import CommunityList from './pages/community/CommunityList'
+import NewPost from './pages/community/NewPost'
+import PostDetail from './pages/community/PostDetail'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -22,6 +25,10 @@ createRoot(document.getElementById('root')!).render(
           <Route path="genre/:slug" element={<Browse kind="genre" />} />
           <Route path="library" element={<Library />} />
           <Route path="library/new" element={<NewCollection />} />
+          <Route path="community" element={<Navigate to="/community/discussions" replace />} />
+          <Route path="community/:section" element={<CommunityList />} />
+          <Route path="community/:section/new" element={<NewPost />} />
+          <Route path="community/:section/:id" element={<PostDetail />} />
           <Route path="games/:id" element={<GameDetails />} />
           <Route path="games/:id/play" element={<GamePlayer />} />
           <Route path="*" element={<ComingSoon />} />
