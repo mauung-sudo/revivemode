@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { supabase } from '../../lib/supabase'
 
-// Newsletter signup. Frontend only for now: the submit handler is the hook
-// for the backend (docs/BACKEND.md → newsletter_subscribers).
+// Newsletter signup. Saves to Supabase (newsletter_subscribers) when the
+// backend is configured; otherwise just shows the success state.
 export default function KeepInTouch() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   return (
     <section className="relative h-[445px] overflow-hidden bg-gradient-to-b from-[#145055] to-neutral-800">
@@ -26,9 +28,16 @@ export default function KeepInTouch() {
           </p>
         </div>
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault()
-            if (email) setSent(true)
+            if (!email) return
+            setError(null)
+            if (supabase) {
+              const { error } = await supabase.from('newsletter_subscribers').insert({ email: email.trim().toLowerCase() })
+              // 23505 = already subscribed; treat as success.
+              if (error && error.code !== '23505') return setError('Could not subscribe. Please try again.')
+            }
+            setSent(true)
           }}
           className="border-4 border-black bg-white text-black"
         >
@@ -56,6 +65,7 @@ export default function KeepInTouch() {
             >
               {sent ? 'DONE' : 'SUBMIT'}
             </button>
+            {error && <p className="mt-2 text-[14px] text-primary-500">{error}</p>}
           </div>
         </form>
       </div>
