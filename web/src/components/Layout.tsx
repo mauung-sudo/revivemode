@@ -1,19 +1,21 @@
-import { Link, Outlet } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
+import Footer from './Footer'
+import Navbar from './Navbar'
 
 export default function Layout() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
+
   return (
-    <div className="flex min-h-full flex-col">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link to="/" className="text-lg font-bold tracking-tight">
-            Revive<span className="text-accent">Mode</span>
-          </Link>
-          <nav className="text-sm text-muted">Prototype</nav>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+    <div className="flex min-h-screen flex-col">
+      <Navbar />
+      <main className="flex-1">
         <Outlet />
       </main>
+      <Footer />
     </div>
   )
 }
