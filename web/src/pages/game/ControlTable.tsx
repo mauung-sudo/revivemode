@@ -1,25 +1,16 @@
 import { useEffect, useState } from 'react'
+import { DEFAULT_SETTINGS, updateSettings, useSettings } from '../../lib/settingsStore'
 
 const BUTTONS = ['up', 'down', 'left', 'right', 'A', 'B', 'SELECT', 'START'] as const
 type Btn = (typeof BUTTONS)[number]
-const DEFAULT: Record<Btn, string> = { up: 'up', down: 'down', left: 'left', right: 'right', A: 'X', B: 'Z', SELECT: 'SHIFT', START: 'ENTER' }
-const KEY = 'revivemode.controls.v1'
-
-function load(): Record<Btn, string> {
-  try {
-    return { ...DEFAULT, ...JSON.parse(localStorage.getItem(KEY) || '{}') }
-  } catch {
-    return DEFAULT
-  }
-}
 
 const keyLabel = (e: KeyboardEvent) =>
   e.key.startsWith('Arrow') ? e.key.slice(5).toLowerCase() : e.key === ' ' ? 'SPACE' : e.key.length === 1 ? e.key.toUpperCase() : e.key.toUpperCase()
 
 // Keyboard map shown beside the player. P2 is assigned when a second player joins a room.
-// Saved locally; the emulator's own "Control Settings" menu applies in-game remaps.
+// Saved with the player's settings (and to the account when signed in); the emulator's own "Control Settings" menu applies in-game remaps.
 export default function ControlTable({ controller }: { controller?: string }) {
-  const [map, setMap] = useState(load)
+  const map = { ...DEFAULT_SETTINGS.controls, ...useSettings().controls } as Record<Btn, string>
   const [editing, setEditing] = useState(false)
   const [listening, setListening] = useState<Btn | null>(null)
 
@@ -28,13 +19,7 @@ export default function ControlTable({ controller }: { controller?: string }) {
     const onKey = (e: KeyboardEvent) => {
       e.preventDefault()
       if (e.key !== 'Escape') {
-        const next = { ...map, [listening]: keyLabel(e) }
-        setMap(next)
-        try {
-          localStorage.setItem(KEY, JSON.stringify(next))
-        } catch {
-          /* ignore */
-        }
+        updateSettings({ controls: { ...map, [listening]: keyLabel(e) } })
       }
       setListening(null)
     }
