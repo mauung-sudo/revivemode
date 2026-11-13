@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import Avatar from './Avatar'
+import { hasBackend } from '../lib/supabase'
+import { openSignIn, useAuth } from '../lib/auth'
 
 const NAV = [
   { to: '/', label: 'Home', icon: '/assets/ui/ic-controller.svg', end: true },
@@ -27,6 +29,29 @@ function SearchButton({ compact = false }: { compact?: boolean }) {
         Games, topics, discussions
       </span>
     </button>
+  )
+}
+
+// Profile avatar when signed in (or in local-only prototype mode);
+// a Sign in button when accounts are set up but nobody is signed in.
+function AccountButton({ size }: { size: number }) {
+  const { ready, session, profile } = useAuth()
+  if (hasBackend && ready && !session)
+    return (
+      <button
+        type="button"
+        onClick={openSignIn}
+        className={`whitespace-nowrap rounded-lg border-2 border-black bg-secondary-500 font-pixel leading-none text-black hover:bg-secondary-400 ${
+          size > 24 ? 'px-3 py-1.5 text-[20px] tracking-[1px]' : 'px-2 py-1 text-[16px]'
+        }`}
+      >
+        Sign in
+      </button>
+    )
+  return (
+    <Link to="/profile" aria-label="Your profile" className="rounded-full bg-neutral-500 p-0.5">
+      <Avatar size={size} src={profile?.avatar_url} />
+    </Link>
   )
 }
 
@@ -66,9 +91,7 @@ export default function Navbar() {
             <button type="button" aria-label="Notifications" className="rounded-lg p-2.5 hover:bg-neutral-600">
               <img src="/assets/ui/notice.png" alt="" className="size-6" />
             </button>
-            <Link to="/profile" aria-label="Your profile" className="rounded-full bg-neutral-500 p-0.5">
-              <Avatar size={32} />
-            </Link>
+            <AccountButton size={32} />
           </div>
         </div>
       </div>
@@ -82,9 +105,7 @@ export default function Navbar() {
           <SearchButton compact />
         </div>
         <div className="flex items-center gap-3">
-          <Link to="/profile" aria-label="Your profile" className="rounded-full bg-neutral-500 p-0.5">
-            <Avatar size={24} />
-          </Link>
+          <AccountButton size={24} />
           <button type="button" aria-label="Menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="size-6">
             <img src="/assets/ui/menu.svg" alt="" width={24} height={24} />
           </button>

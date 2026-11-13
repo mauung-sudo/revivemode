@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import Footer from './Footer'
 import Navbar from './Navbar'
+import SignInModal from './SignInModal'
 
 export default function Layout() {
   const { pathname } = useLocation()
@@ -16,6 +17,7 @@ export default function Layout() {
         <Outlet />
       </main>
       <Footer />
+      <SignInModal />
     </div>
   )
 }

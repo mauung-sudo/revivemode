@@ -1,7 +1,10 @@
 // Default pixel avatar from the design (orange disc, heart head, pixel body).
 // Scales from the 32px desktop version.
-export default function Avatar({ size = 32 }: { size?: number }) {
+export default function Avatar({ size = 32, src }: { size?: number; src?: string | null }) {
   const s = size / 32
+  // Picture from the sign-in provider (Google/Discord), when there is one.
+  if (src)
+    return <img src={src} alt="" referrerPolicy="no-referrer" className="block shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />
   return (
     <span
       className="relative block shrink-0 overflow-hidden rounded-full bg-[#ffae1b]"

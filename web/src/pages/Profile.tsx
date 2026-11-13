@@ -5,6 +5,8 @@ import { usePosts } from '../data/community'
 import type { SortKey } from '../lib/gameFilter'
 import { DEFAULT_SETTINGS, resetSettings, updateSettings, useSettings, type Settings } from '../lib/settingsStore'
 import { ContinuePlaying } from './Library'
+import { hasBackend } from '../lib/supabase'
+import { openSignIn, signOut, updateDisplayName, useAuth } from '../lib/auth'
 
 const STATS = [
   ['15', 'Level'],
@@ -194,18 +196,76 @@ function EmulatorSettings({ s, set, q }: { s: Settings; set: (p: Partial<Setting
   )
 }
 
-function OtherSettings({ tab, s, set }: { tab: Tab; s: Settings; set: (p: Partial<Settings>) => void }) {
-  if (tab === 'Account Settings')
+const INPUT = 'w-48 rounded-lg border border-[#989898] bg-neutral-800 px-3 py-2 text-[14px] focus:border-secondary-500 focus:outline-none'
+
+function AccountSettings({ s, set }: { s: Settings; set: (p: Partial<Settings>) => void }) {
+  const { session, profile } = useAuth()
+  const [name, setName] = useState<string | null>(null) // null = not edited
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  // Local-only prototype: no accounts, settings live in this browser.
+  if (!hasBackend)
     return (
       <Group title="Account">
         <Row title="Display name">
-          <input value={s.displayName} onChange={(e) => set({ displayName: e.target.value })} aria-label="Display name" className="w-48 rounded-lg border border-[#989898] bg-neutral-800 px-3 py-2 text-[14px] focus:border-secondary-500 focus:outline-none" />
+          <input value={s.displayName} onChange={(e) => set({ displayName: e.target.value })} aria-label="Display name" className={INPUT} />
         </Row>
-        <Row title="Email" desc="Sign-in arrives with accounts (backend).">
-          <input type="email" value={s.email} onChange={(e) => set({ email: e.target.value })} placeholder="you@example.com" aria-label="Email" className="w-48 rounded-lg border border-[#989898] bg-neutral-800 px-3 py-2 text-[14px] focus:border-secondary-500 focus:outline-none" />
+        <Row title="Email" desc="Accounts are not set up on this copy of Revive Mode.">
+          <input type="email" value={s.email} onChange={(e) => set({ email: e.target.value })} placeholder="you@example.com" aria-label="Email" className={INPUT} />
         </Row>
       </Group>
     )
+
+  if (!session)
+    return (
+      <Group title="Account">
+        <Row title="You are not signed in" desc="Sign in to keep your library, settings and posts on every device.">
+          <button type="button" onClick={openSignIn} className="rounded-lg bg-secondary-500 px-4 py-2 text-[14px] font-bold text-black hover:bg-secondary-400">
+            Sign in
+          </button>
+        </Row>
+      </Group>
+    )
+
+  const current = name ?? profile?.display_name ?? ''
+  const save = async () => {
+    if (name === null || name.trim() === profile?.display_name) return setName(null)
+    const err = await updateDisplayName(name)
+    setMsg(err ? { ok: false, text: err } : { ok: true, text: 'Saved' })
+    if (!err) setName(null)
+  }
+
+  return (
+    <Group title="Account">
+      <Row title="Display name" desc={msg ? undefined : profile ? `@${profile.username}` : undefined}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            save()
+          }}
+          className="flex items-center gap-2"
+        >
+          <input value={current} maxLength={40} onChange={(e) => (setName(e.target.value), setMsg(null))} aria-label="Display name" className={INPUT} />
+          <button type="submit" disabled={name === null} className="rounded-lg bg-secondary-500 px-3 py-2 text-[14px] font-bold text-black hover:bg-secondary-400 disabled:opacity-40">
+            Save
+          </button>
+        </form>
+      </Row>
+      {msg && <p className={`px-4 text-[13px] font-bold ${msg.ok ? 'text-secondary-400' : 'text-primary-500'}`}>{msg.text}</p>}
+      <Row title="Email" desc="Used to sign in. Change it from your sign-in provider.">
+        <span className="break-all text-[14px] text-neutral-50">{session.user.email}</span>
+      </Row>
+      <Row title="Sign out" desc="Your local library stays on this device.">
+        <button type="button" onClick={signOut} className="rounded-lg border-2 border-primary-500 px-4 py-2 text-[14px] font-bold text-primary-500 hover:bg-primary-500 hover:text-white">
+          Sign out
+        </button>
+      </Row>
+    </Group>
+  )
+}
+
+function OtherSettings({ tab, s, set }: { tab: Tab; s: Settings; set: (p: Partial<Settings>) => void }) {
+  if (tab === 'Account Settings') return <AccountSettings s={s} set={set} />
   if (tab === 'Theme Preferences')
     return (
       <Group title="Theme">
@@ -260,6 +320,7 @@ function OtherSettings({ tab, s, set }: { tab: Tab; s: Settings; set: (p: Partia
 export default function Profile() {
   const navigate = useNavigate()
   const s = useSettings()
+  const { profile } = useAuth()
   const posts = usePosts()
   const [tab, setTab] = useState<Tab>('discussions')
   const [sort, setSort] = useState<SortKey>('newest')
@@ -309,11 +370,13 @@ export default function Profile() {
           <div className="relative flex items-center gap-6 max-lg:flex-col max-lg:items-start">
             <div className="flex items-end gap-4">
               <div className="relative">
-                <img src="/assets/profile/avatar.png" alt="" className="size-[140px] rounded-xl border-[6px] border-neutral-700 object-cover max-md:size-[110px]" />
+                <img src={profile?.avatar_url || '/assets/profile/avatar.png'} referrerPolicy="no-referrer" alt="" className="size-[140px] rounded-xl border-[6px] border-neutral-700 object-cover max-md:size-[110px]" />
               </div>
               <div className="pb-2">
-                <h1 className="text-[40px] font-bold leading-none">{s.displayName}</h1>
-                <p className="mt-2 text-[14px] font-bold text-neutral-50">joined Nov 2023</p>
+                <h1 className="text-[40px] font-bold leading-none">{profile?.display_name ?? s.displayName}</h1>
+                <p className="mt-2 text-[14px] font-bold text-neutral-50">
+                  joined {profile ? new Date(profile.created_at).toLocaleDateString('en', { month: 'short', year: 'numeric' }) : 'Nov 2023'}
+                </p>
               </div>
             </div>
             <div className="flex-1" />
