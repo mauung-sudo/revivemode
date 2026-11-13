@@ -4,13 +4,14 @@ import AddGameCard from '../components/AddGameCard'
 import FilterBar from '../components/FilterBar'
 import GameGrid from '../components/GameGrid'
 import TvCard from '../components/TvCard'
-import { mockGame, type MockGame } from '../data/games'
+import type { MockGame } from '../data/games'
+import { useGame, useGamesByIds } from '../lib/catalog'
 import { useFilteredGames } from '../lib/gameFilter'
 import { library, useLibrary } from '../lib/libraryStore'
 
 export function ContinuePlaying() {
   const { lastPlayed } = useLibrary()
-  const game = lastPlayed ? mockGame(lastPlayed) : undefined
+  const game = useGame(lastPlayed)
   if (!game) return null
   return (
     <Link
@@ -72,7 +73,7 @@ export default function Library() {
   const tabs = useRef<HTMLDivElement>(null)
   const active = lib.collections.find((c) => c.id === params.get('c'))
   const ids = active ? active.gameIds : lib.myGames
-  const games = ids.map(mockGame).filter((g): g is MockGame => !!g)
+  const games = useGamesByIds(ids)
   const { filters, update, results } = useFilteredGames(games)
 
   const selectTab = (id?: string) => navigate(id ? `/library?c=${id}` : '/library', { replace: true })
@@ -139,7 +140,7 @@ export default function Library() {
             </div>
           </div>
         ) : (
-          <GameGrid games={results} empty="Your library is empty. Add games from Home or Search." />
+          <GameGrid games={results} empty={lib.syncing ? 'Loading your library…' : 'Your library is empty. Add games from Home or Search.'} />
         )}
       </div>
     </div>

@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import SectionTitle, { SeeAll } from '../../components/SectionTitle'
 import TvCard from '../../components/TvCard'
-import { COMMUNITY_PICKS, FEATURED, GENRES, MOSTLY_PLAYED, NEWLY_ADDED, type MockGame } from '../../data/games'
+import { COMMUNITY_PICKS, GENRES, MOSTLY_PLAYED, NEWLY_ADDED } from '../../data/games'
+import { useFeatured, useGamesByIds } from '../../lib/catalog'
 
 // 32px pixel-brick strip that separates the rows in the design.
 export function BrickDivider() {
@@ -14,7 +15,8 @@ export function BrickDivider() {
   )
 }
 
-function Row({ games }: { games: MockGame[] }) {
+function Row({ ids }: { ids: readonly string[] }) {
+  const games = useGamesByIds(ids)
   return (
     <div className="no-scrollbar -mx-4 flex gap-6 overflow-x-auto px-4 pb-2 lg:justify-center">
       {games.map((g) => (
@@ -25,6 +27,7 @@ function Row({ games }: { games: MockGame[] }) {
 }
 
 export default function GameRows() {
+  const featured = useFeatured()
   return (
     <section className="bg-neutral-800">
       <BrickDivider />
@@ -32,7 +35,7 @@ export default function GameRows() {
         <div className="pb-16 pt-8">
           <SectionTitle icon="/assets/home/section-star.png">Featured</SectionTitle>
           <div className="no-scrollbar -mx-4 flex gap-[13px] overflow-x-auto px-4">
-            {FEATURED.map((g, i) => (
+            {featured.map((g, i) => (
               <TvCard key={g.id} game={g} variant="large" className={`shrink-0 ${i === 1 ? 'w-[467px]' : 'w-[428px]'} max-md:w-[300px]`} />
             ))}
           </div>
@@ -42,7 +45,7 @@ export default function GameRows() {
       <div className="mx-auto max-w-[1024px] px-4 lg:px-0">
         <div className="pb-16">
           <SectionTitle action={<SeeAll to="/library?sort=new" />}>Newly added</SectionTitle>
-          <Row games={NEWLY_ADDED} />
+          <Row ids={NEWLY_ADDED} />
         </div>
       </div>
       <BrickDivider />
@@ -51,14 +54,14 @@ export default function GameRows() {
           <SectionTitle icon="/assets/home/ic-trending.png" action={<SeeAll to="/library?sort=popular" />}>
             Mostly played
           </SectionTitle>
-          <Row games={MOSTLY_PLAYED} />
+          <Row ids={MOSTLY_PLAYED} />
         </div>
       </div>
       <BrickDivider />
       <div className="mx-auto max-w-[1024px] px-4 lg:px-0">
         <div className="pb-16 pt-8">
           <SectionTitle icon="/assets/home/ic-trophy.png">Community picks</SectionTitle>
-          <Row games={COMMUNITY_PICKS} />
+          <Row ids={COMMUNITY_PICKS} />
         </div>
       </div>
       <BrickDivider />

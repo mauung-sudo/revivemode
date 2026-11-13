@@ -12,6 +12,8 @@ Status: **schema ready, not yet connected.** The frontend runs entirely on `loca
 | `web/.env.example` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 
 Already wired:
+- **Games catalog** reads the `games` table (bundled list as fallback).
+- **Library, collections and Continue playing** sync to the account when signed in.
 - **Newsletter signup** writes to `newsletter_subscribers` when keys are set.
 - **Sign-in** (`lib/auth.ts`, `components/SignInModal.tsx`): email magic link, plus Google/Discord buttons that appear automatically once those providers are enabled. The navbar shows a Sign in button or the account avatar. Profile → Account Settings edits `profiles.display_name` and has Sign out.
 
@@ -69,8 +71,8 @@ newsletter_subscribers (insert-only)
 Each step swaps one localStorage store for Supabase, keeping the localStorage path as a fallback:
 
 1. ~~**Auth:** sign-in modal and session hook (`useAuth()`); the navbar avatar shows the real profile.~~ Done.
-2. **Games catalog:** `games` query replaces `GAMES`; search moves to the `games_search_idx` full-text index.
-3. **Library + collections + continue playing.** On first login, migrate the local library to the account.
+2. ~~**Games catalog:**~~ Done. `lib/catalog.ts` loads the `games` table and falls back to the bundled list. Search still filters in the browser, which is fine for a few hundred games; move it to the `games_search_idx` full-text index when the catalog grows.
+3. ~~**Library + collections + continue playing.**~~ Done. When signed in, `lib/libraryStore.ts` reads and writes `library_items`, `collections`, `collection_games` and `play_sessions`. The first sign-in on a browser with a local library copies it into an empty account, once per account.
 4. **Settings and controls:** stored in `profiles.settings`.
 5. **Community:** posts, replies, likes; creation images upload to the `creations` bucket.
 6. **Game comments and votes.**

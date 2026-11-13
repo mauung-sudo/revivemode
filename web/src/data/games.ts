@@ -1,4 +1,5 @@
-// Mock catalog used by the UI until the backend exists (see docs/BACKEND.md).
+// Bundled catalog: the fallback when there is no backend, and the source for
+// supabase/seed.sql. The live list comes from the `games` table (lib/catalog.ts).
 // These are the titles shown in the Figma design. They are commercial games,
 // so they have no playable file here: "Play" asks the user to load their own copy.
 // Playable homebrew sets `file` + `license` (e.g. test-pattern).
@@ -70,14 +71,11 @@ export const PLATFORMS: { slug: string; name: Platform; banner?: string }[] = [
 ]
 export const platformBySlug = (slug: string) => PLATFORMS.find((p) => p.slug === slug)
 
-const byId = new Map(GAMES.map((g) => [g.id, g]))
-export const mockGame = (id: string) => byId.get(id)
-const pick = (...ids: string[]) => ids.map((id) => byId.get(id)!)
-
-export const FEATURED = pick('super-mario-world', 'sonic-2', 'pac-man', 'street-fighter-2')
-export const NEWLY_ADDED = pick('mega-man-x', 'castlevania-sotn', 'metal-slug', 'crash-bandicoot')
-export const MOSTLY_PLAYED = pick('tetris', 'sf-alpha', 'sonic', 'space-invaders')
-export const COMMUNITY_PICKS = pick('mortal-kombat', 'chrono-trigger', 'metroid', 'ff7')
+// Curated Home rows (game ids). Featured comes from games.featured in the
+// database; see lib/catalog.ts for lookups.
+export const NEWLY_ADDED = ['mega-man-x', 'castlevania-sotn', 'metal-slug', 'crash-bandicoot']
+export const MOSTLY_PLAYED = ['tetris', 'sf-alpha', 'sonic', 'space-invaders']
+export const COMMUNITY_PICKS = ['mortal-kombat', 'chrono-trigger', 'metroid', 'ff7']
 
 export const genreBySlug = (slug: string) => GENRES.find((g) => g.name.toLowerCase() === slug.toLowerCase())
 

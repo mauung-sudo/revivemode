@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import EmulatorFrame from '../../components/EmulatorFrame'
-import { mockGame, type MockGame } from '../../data/games'
+import type { MockGame } from '../../data/games'
+import { useGame as useCatalogGame } from '../../lib/catalog'
 import { library } from '../../lib/libraryStore'
 import { setLocalRom, getLocalRom } from '../../lib/localRom'
 import ComingSoon from '../ComingSoon'
@@ -30,7 +31,7 @@ function TopBar({ game }: { game: MockGame }) {
 
 function useGame() {
   const { id = '' } = useParams()
-  return mockGame(id)
+  return useCatalogGame(id)
 }
 
 // Blurred cover behind the info block (design: bg-thumbnail).

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { GAMES } from '../../data/games'
+import { useGames } from '../../lib/catalog'
 import { addPost, SECTIONS, type Challenge, type Section } from '../../data/community'
 import { BackButton, PrimaryButton } from '../NewCollection'
 
@@ -18,6 +18,7 @@ const PLACEHOLDER: Record<Section, { title: string; body: string }> = {
 }
 
 export default function NewPost() {
+  const allGames = useGames()
   const { section } = useParams() as { section: Section }
   const navigate = useNavigate()
   const meta = SECTIONS.find((s) => s.id === section)
@@ -65,7 +66,7 @@ export default function NewPost() {
     if (section === 'discussions') addPost({ ...base, kind: 'discussions', body: text, likes: 0, views: 0 })
     if (section === 'creations') addPost({ ...base, kind: 'creations', body: text, likes: 0, images })
     if (section === 'challenges')
-      addPost({ ...base, kind: 'challenges', game, platform: GAMES.find((g) => g.title === game)?.platform ?? '', difficulty: difficulty!, competitors: 0, points: 100, badge: { name: 'Pioneer', icon: '/assets/community/trophy.png' }, rules: text.split('\n').map((l) => l.replace(/^-\s*/, '').trim()).filter(Boolean) })
+      addPost({ ...base, kind: 'challenges', game, platform: allGames.find((g) => g.title === game)?.platform ?? '', difficulty: difficulty!, competitors: 0, points: 100, badge: { name: 'Pioneer', icon: '/assets/community/trophy.png' }, rules: text.split('\n').map((l) => l.replace(/^-\s*/, '').trim()).filter(Boolean) })
     navigate(`/community/${section}/${base.id}`, { replace: true })
   }
 
@@ -122,7 +123,7 @@ export default function NewPost() {
               <img src="/assets/ui/search.png" alt="" className="size-5" />
               <input list="challenge-games" value={game} onChange={(e) => setGame(e.target.value)} readOnly={preview} placeholder="Find the game to challenge" className="min-w-0 flex-1 bg-transparent placeholder:text-white focus:outline-none" />
               <datalist id="challenge-games">
-                {GAMES.map((g) => (
+                {allGames.map((g) => (
                   <option key={g.id} value={g.title} />
                 ))}
               </datalist>

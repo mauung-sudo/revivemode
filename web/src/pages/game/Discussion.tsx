@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import TvCard from '../../components/TvCard'
 import Avatar from '../../components/Avatar'
-import { GAMES, type MockGame } from '../../data/games'
+import type { MockGame } from '../../data/games'
+import { useGames } from '../../lib/catalog'
 import { SAMPLE_COMMENTS, type Comment } from '../../data/gameDetails'
 
 function CommentRow({ c }: { c: Comment }) {
@@ -34,7 +35,7 @@ function CommentRow({ c }: { c: Comment }) {
 export default function Discussion({ game }: { game: MockGame }) {
   const [comments, setComments] = useState(() => SAMPLE_COMMENTS(game.title))
   const [draft, setDraft] = useState('')
-  const related = GAMES.filter((g) => g.id !== game.id && (g.genre === game.genre || g.platform === game.platform)).slice(0, 3)
+  const related = useGames().filter((g) => g.id !== game.id && (g.genre === game.genre || g.platform === game.platform)).slice(0, 3)
 
   return (
     <section className="flex gap-12 py-10 max-lg:flex-col">

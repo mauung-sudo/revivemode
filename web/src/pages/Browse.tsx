@@ -1,7 +1,8 @@
 import { useParams } from 'react-router-dom'
 import FilterBar from '../components/FilterBar'
 import GameGrid from '../components/GameGrid'
-import { GAMES, genreBySlug, platformBySlug } from '../data/games'
+import { genreBySlug, platformBySlug } from '../data/games'
+import { useGames } from '../lib/catalog'
 import { useFilteredGames } from '../lib/gameFilter'
 import ComingSoon from './ComingSoon'
 
@@ -32,7 +33,8 @@ export default function Browse({ kind }: { kind: 'platform' | 'genre' }) {
   const { slug = '' } = useParams()
   const platform = kind === 'platform' ? platformBySlug(slug) : undefined
   const genre = kind === 'genre' ? genreBySlug(slug) : undefined
-  const base = GAMES.filter((g) => (platform ? g.platform === platform.name : genre ? g.genre === genre.name : false))
+  const all = useGames()
+  const base = all.filter((g) => (platform ? g.platform === platform.name : genre ? g.genre === genre.name : false))
   const { filters, update, results } = useFilteredGames(base)
 
   if (!platform && !genre) return <ComingSoon />

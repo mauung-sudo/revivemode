@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AddGameCard from '../components/AddGameCard'
 import TvCard from '../components/TvCard'
-import { mockGame, type MockGame } from '../data/games'
+import { useGamesByIds } from '../lib/catalog'
 import { library } from '../lib/libraryStore'
 
 export function BackButton({ onClick, label = 'BACK' }: { onClick: () => void; label?: string }) {
@@ -29,7 +29,7 @@ export default function NewCollection() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [ids, setIds] = useState<string[]>([])
-  const games = ids.map(mockGame).filter((g): g is MockGame => !!g)
+  const games = useGamesByIds(ids)
 
   const create = () => {
     const id = library.createCollection(name, ids)

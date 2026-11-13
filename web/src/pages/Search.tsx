@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import FilterBar from '../components/FilterBar'
 import GameGrid from '../components/GameGrid'
-import { GAMES } from '../data/games'
+import { useGames } from '../lib/catalog'
 import { useFilteredGames } from '../lib/gameFilter'
 
 const TABS = ['Games', 'Discussions', 'Challenges', 'Fan creations'] as const
@@ -12,7 +12,7 @@ const TABS = ['Games', 'Discussions', 'Challenges', 'Fan creations'] as const
 export default function Search() {
   const navigate = useNavigate()
   const input = useRef<HTMLInputElement>(null)
-  const { filters, update, results } = useFilteredGames(GAMES)
+  const { filters, update, results } = useFilteredGames(useGames())
   const [tab, setTab] = useState<(typeof TABS)[number]>('Games')
   const q = filters.q.trim()
   const close = () => ((window.history.state?.idx ?? 0) > 0 ? navigate(-1) : navigate('/'))

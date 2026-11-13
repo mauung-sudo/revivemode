@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { GAMES, type MockGame } from '../data/games'
+import type { MockGame } from '../data/games'
+import { useGames } from '../lib/catalog'
 
 // "Search any games to add" card. States from the design: default → typing → selected.
 export default function AddGameCard({ exclude, onAdd }: { exclude: string[]; onAdd: (id: string) => void }) {
+  const all = useGames()
   const [mode, setMode] = useState<'idle' | 'typing' | 'selected'>('idle')
   const [q, setQ] = useState('')
   const [picked, setPicked] = useState<MockGame | null>(null)
@@ -13,7 +15,7 @@ export default function AddGameCard({ exclude, onAdd }: { exclude: string[]; onA
   }, [mode])
 
   const matches = q.trim()
-    ? GAMES.filter((g) => !exclude.includes(g.id) && g.title.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 6)
+    ? all.filter((g) => !exclude.includes(g.id) && g.title.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 6)
     : []
 
   const reset = () => {
