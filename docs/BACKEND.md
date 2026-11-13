@@ -63,6 +63,7 @@ newsletter_subscribers (insert-only)
    ```bash
    npx supabase link --project-ref <ref> && npx supabase db push
    ```
+   Later migrations go in the same way, oldest first (for example `20261113000000_free_games.sql`, which adds `source_url` and µCity).
 3. Seed games: run `supabase/seed.sql` in the SQL editor (regenerate it first with `node supabase/gen-seed.mjs` if `games.ts` changed).
 4. Auth → Providers: enable **Google** and/or **Discord** (each needs a free OAuth app). Add `http://localhost:5173` and your Pages URL to the redirect allow-list.
 5. Copy `web/.env.example` to `web/.env.local` and fill both values. In Cloudflare Pages, add the same two as environment variables.
@@ -85,3 +86,13 @@ Each step swaps one localStorage store for Supabase, keeping the localStorage pa
 - The free plan includes 500 MB of database, 1 GB of storage and 50k monthly active users. **Free projects pause after about a week with no activity.**
 - Save states are small (KB to low MB), but cap slots per game (for example 3) to stay inside 1 GB.
 - Move cover art and game files to Cloudflare R2 (no egress fees) before traffic grows. Storage URLs in `games.cover_url` / `rom_url` are plain strings, so no schema change is needed.
+
+## Hosting free games
+
+Only host games whose license allows it, such as homebrew under MIT, GPL, CC BY or CC0, or with written permission from the author. Commercial games stay bring-your-own-ROM.
+
+For each game:
+1. Put the unmodified ROM in `web/public/games/`. Add its license text and a credit entry to `web/public/games/licenses/`.
+2. Add the game to `web/src/data/games.ts` with `file`, `license`, `author` and (for GPL) `source`.
+3. Add a migration that inserts the row. The database refuses a hosted ROM without a license, or a GPL game without a source link.
+4. Run `node supabase/gen-seed.mjs` so the seed stays in sync.

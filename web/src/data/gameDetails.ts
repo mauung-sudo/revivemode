@@ -19,6 +19,13 @@ const INFO: Record<string, GameInfo> = {
       "In Super Mario Bros., the player controls Mario, the protagonist of the series. Mario's brother, Luigi, is controlled by the second player in the game's multiplayer mode and assumes the same plot role and functionality as Mario. The objective is to race through the Mushroom Kingdom, survive the main antagonist Bowser's forces, and save Princess Toadstool. It is a side-scrolling platform game where the player moves to the right to reach the flagpole at the end of each level.",
     screenshots: ['/assets/game/ss-1.png', '/assets/game/ss-2.png', '/assets/game/ss-3.png', '/assets/game/ss-4.png'],
   },
+  ucity: {
+    publisher: 'Antonio Niño Díaz (homebrew)',
+    plot: 'An open-source city builder made for the Game Boy Color in 2017. You are the mayor of a small town and decide where homes, shops, factories and roads go as it grows into a city.',
+    gameplay:
+      'Zone land, build power plants and services, set the budget and keep citizens happy while dealing with traffic, pollution and the occasional disaster. Cities are saved in the cartridge memory, so you can come back to them later.',
+    screenshots: ['/assets/covers/ucity.webp'],
+  },
   'test-pattern': {
     publisher: 'Revive Mode',
     plot: 'A tiny homebrew ROM made for this project. It fills the screen with a single color so we can check the emulator pipeline end to end.',

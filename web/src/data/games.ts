@@ -5,7 +5,7 @@
 // Playable homebrew sets `file` + `license` (e.g. test-pattern).
 
 export type Platform = 'NES' | 'SNES' | 'Sega Genesis' | 'PSX' | 'Neo Geo' | 'Game Boy' | 'Arcade' | 'Atari'
-export type Genre = 'Action' | 'Adventure' | 'Fighting' | 'Platformer' | 'Shooter' | 'Puzzle' | 'Racing' | 'RPG'
+export type Genre = 'Action' | 'Adventure' | 'Fighting' | 'Platformer' | 'Shooter' | 'Puzzle' | 'Racing' | 'RPG' | 'Simulation'
 
 export interface MockGame {
   id: string
@@ -19,6 +19,10 @@ export interface MockGame {
   file?: string
   /** License of the bundled file. Required when `file` is set. */
   license?: string
+  /** Who made it, shown as the credit line (required by CC BY / GPL). */
+  author?: string
+  /** Where the source code lives (required by the GPL). */
+  source?: string
 }
 
 const c = (f: string) => `/assets/covers/${f}`
@@ -57,6 +61,7 @@ export const GAMES: MockGame[] = [
   { id: 'soulcalibur', title: 'Soulcalibur', platform: 'Arcade', genre: 'Fighting', year: 1998, cover: c('soulcalibur.webp'), players: 2 },
   { id: 'samurai-shodown', title: 'Samurai Shodown II', platform: 'Neo Geo', genre: 'Fighting', year: 1994, cover: c('samurai-shodown.webp'), players: 2 },
   { id: 'test-pattern', title: 'Test Pattern', platform: 'NES', genre: 'Puzzle', year: 2026, cover: c('test-pattern.webp'), players: 1, file: '/games/test-pattern.nes', license: 'CC0-1.0' },
+  { id: 'ucity', title: 'µCity', platform: 'Game Boy', genre: 'Simulation', year: 2017, cover: c('ucity.webp'), players: 1, file: '/games/ucity.gbc', license: 'GPL-3.0-or-later; art and music CC BY-SA 4.0', author: 'Antonio Niño Díaz (AntonioND)', source: 'https://codeberg.org/SkyLyrac/ucity' },
   { id: 'darkstalkers', title: 'Darkstalkers', platform: 'Arcade', genre: 'Fighting', year: 1994, cover: c('darkstalkers.webp'), players: 2 },
 ]
 

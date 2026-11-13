@@ -36,13 +36,15 @@ interface GameRow {
   cover_url: string
   rom_url: string | null
   rom_license: string | null
+  publisher: string | null
+  source_url: string | null
   featured: boolean
 }
 
 if (supabase) {
   supabase
     .from('games')
-    .select('id, title, platform, genre, year, players, cover_url, rom_url, rom_license, featured')
+    .select('id, title, platform, genre, year, players, cover_url, rom_url, rom_license, publisher, source_url, featured')
     .order('created_at')
     .order('id')
     .then(({ data, error }) => {
@@ -57,6 +59,8 @@ if (supabase) {
         players: r.players,
         cover: r.cover_url,
         ...(r.rom_url ? { file: r.rom_url, license: r.rom_license ?? undefined } : {}),
+        ...(r.publisher ? { author: r.publisher } : {}),
+        ...(r.source_url ? { source: r.source_url } : {}),
       }))
       const featured = rows.filter((r) => r.featured).map((r) => r.id)
       state = make(games, featured.length ? featured : state.featuredIds)

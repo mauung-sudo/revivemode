@@ -99,7 +99,7 @@ export default function GameInfoBlock({ game, showPlay = true }: { game: MockGam
               </OutlineButton>
               {/* Downloads only for redistributable homebrew. Commercial titles use bring-your-own-ROM. */}
               {game.file ? (
-                <OutlineButton icon="/assets/game/download.png" href={game.file} download={`${game.id}.nes`}>
+                <OutlineButton icon="/assets/game/download.png" href={game.file} download={`${game.id}.${game.file.split('.').pop()}`}>
                   DOWNLOAD ROM
                 </OutlineButton>
               ) : supported ? (
@@ -116,7 +116,20 @@ export default function GameInfoBlock({ game, showPlay = true }: { game: MockGam
           <h1 className="text-[48px] font-bold leading-tight max-md:text-[32px]">
             {game.title} ({game.year})
           </h1>
-          {game.license && <p className="text-[14px] text-secondary-400">Free to play · {game.license}</p>}
+          {game.license && (
+            <p className="text-[14px] text-secondary-400">
+              Free to play · {game.license}
+              {game.author && <> · by {game.author}</>}
+              {game.source && (
+                <>
+                  {' · '}
+                  <a href={game.source} target="_blank" rel="noreferrer" className="underline hover:text-white">
+                    Source code
+                  </a>
+                </>
+              )}
+            </p>
+          )}
           <h2 className="text-[25px] font-bold">Plot</h2>
           <p className="text-[18px] leading-[30px]">{info.plot}</p>
           <h2 className="text-[25px] font-bold">Gameplay</h2>
