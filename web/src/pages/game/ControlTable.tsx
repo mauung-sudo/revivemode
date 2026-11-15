@@ -8,7 +8,7 @@ const keyLabel = (e: KeyboardEvent) =>
   e.key.startsWith('Arrow') ? e.key.slice(5).toLowerCase() : e.key === ' ' ? 'SPACE' : e.key.length === 1 ? e.key.toUpperCase() : e.key.toUpperCase()
 
 // Keyboard map shown beside the player. P2 is assigned when a second player joins a room.
-// Saved with the player's settings (and to the account when signed in); the emulator's own "Control Settings" menu applies in-game remaps.
+// Saved with the player's settings (and to the account when signed in). public/player.html applies the map in-game, live.
 export default function ControlTable({ controller }: { controller?: string }) {
   const map = { ...DEFAULT_SETTINGS.controls, ...useSettings().controls } as Record<Btn, string>
   const [editing, setEditing] = useState(false)

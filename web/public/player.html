@@ -29,10 +29,114 @@
         window.EJS_pathtodata = EJS_CDN
         window.EJS_color = '#7c5cff'
         window.EJS_startOnLoaded = true
+        window.EJS_onGameStart = () => setTimeout(applySettings, 0)
         const s = document.createElement('script')
         s.src = EJS_CDN + 'loader.js'
         document.body.appendChild(s)
       }
+
+      // ---------------------------------------------------------------
+      // Player settings saved by the site (lib/settingsStore.ts). Same
+      // origin, so this page reads them straight from localStorage and
+      // picks up changes live through the storage event.
+      const SETTINGS_KEY = 'revivemode.settings.v1'
+      const DEFAULTS = {
+        pauseOnBlur: true,
+        controllerSupport: true,
+        vsync: true,
+        smoothing: false,
+        aspect: 'Original',
+        controls: { up: 'up', down: 'down', left: 'left', right: 'right', A: 'X', B: 'Z', SELECT: 'SHIFT', START: 'ENTER' },
+      }
+      function readSettings() {
+        try {
+          const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')
+          return { ...DEFAULTS, ...s, controls: { ...DEFAULTS.controls, ...s.controls } }
+        } catch {
+          return DEFAULTS
+        }
+      }
+
+      // Site button -> EmulatorJS (RetroArch) button index.
+      const BUTTON_INDEX = { B: 0, SELECT: 2, START: 3, up: 4, down: 5, left: 6, right: 7, A: 8 }
+      const NAMED = {
+        up: 38, down: 40, left: 37, right: 39, SPACE: 32, ENTER: 13, SHIFT: 16, CONTROL: 17, ALT: 18, TAB: 9, BACKSPACE: 8,
+        CAPSLOCK: 20, INSERT: 45, DELETE: 46, HOME: 36, END: 35, PAGEUP: 33, PAGEDOWN: 34,
+        ',': 188, '.': 190, '/': 191, ';': 186, '=': 187, '-': 189, '[': 219, ']': 221, '\\': 220, "'": 222, '`': 192,
+      }
+      // Key label from the Controls table (e.g. "X", "up", "ENTER", "F2") -> keyCode.
+      function keyCode(label) {
+        if (label in NAMED) return NAMED[label]
+        if (/^[A-Z0-9]$/.test(label)) return label.charCodeAt(0)
+        const f = /^F([1-9]|1[0-2])$/.exec(label)
+        return f ? 111 + Number(f[1]) : null
+      }
+
+      let pausedByUs = false
+      let gamepadHandler = null
+
+      function applySettings() {
+        const emu = window.EJS_emulator
+        if (!emu || !emu.started) return
+        const s = readSettings()
+
+        // Keyboard map for player 1. Clear the key from any other button so
+        // one press doesn't trigger two buttons.
+        const p1 = emu.controls[0] || (emu.controls[0] = {})
+        // EmulatorJS stores key codes, or key names (its keyMap) in its defaults.
+        const byName = Object.fromEntries(Object.entries(emu.keyMap || {}).map(([code, name]) => [name, Number(code)]))
+        const codeOf = (v) => (typeof v === 'number' ? v : byName[v] ?? null)
+        const assigned = {}
+        for (const [btn, idx] of Object.entries(BUTTON_INDEX)) {
+          const code = keyCode(s.controls[btn])
+          if (code != null) assigned[idx] = code
+        }
+        const used = new Set(Object.values(assigned))
+        for (const i of Object.keys(p1)) {
+          if (!(i in assigned) && p1[i] && used.has(codeOf(p1[i].value))) p1[i].value = ''
+        }
+        for (const [idx, code] of Object.entries(assigned)) {
+          p1[idx] = { ...(p1[idx] || {}), value: code }
+        }
+
+        // Gamepads on or off.
+        if (!gamepadHandler) gamepadHandler = emu.gamepadEvent
+        emu.gamepadEvent = s.controllerSupport ? gamepadHandler : () => {}
+
+        try {
+          emu.gameManager.setVSync(s.vsync ? 1 : 0)
+        } catch {
+          /* core without VSync control */
+        }
+
+        const style = document.getElementById('rm-video') || document.head.appendChild(Object.assign(document.createElement('style'), { id: 'rm-video' }))
+        style.textContent =
+          (s.smoothing ? '' : '#game canvas { image-rendering: pixelated; }') +
+          (s.aspect === 'Stretch' ? '#game canvas { width: 100% !important; height: 100% !important; }' : '')
+
+        if (!s.pauseOnBlur && pausedByUs) {
+          pausedByUs = false
+          emu.play()
+        }
+      }
+
+      window.addEventListener('storage', (e) => {
+        if (e.key === SETTINGS_KEY) applySettings()
+      })
+
+      document.addEventListener('visibilitychange', () => {
+        const emu = window.EJS_emulator
+        if (!emu || !emu.started) return
+        if (document.hidden) {
+          if (readSettings().pauseOnBlur && !emu.paused) {
+            emu.pause()
+            pausedByUs = true
+          }
+        } else if (pausedByUs) {
+          pausedByUs = false
+          emu.play()
+        }
+      })
     </script>
   </body>
 </html>

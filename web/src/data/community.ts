@@ -1,8 +1,13 @@
 import { useSyncExternalStore } from 'react'
+import { getAuth } from '../lib/auth'
+import { gameByTitle } from '../lib/catalog'
+import { supabase } from '../lib/supabase'
 
-// Community content. Seeded from the Figma design; posts the user creates
-// are kept in localStorage until the backend exists (docs/BACKEND.md →
-// discussions, challenges, creations, replies).
+// Community content. Sample posts from the Figma design are always shown
+// after the real ones. With a backend, real posts, replies and likes come
+// from Supabase (posts, post_replies, post_likes, challenge_entries) and
+// posting needs an account. Without one (local prototype), the user's own
+// posts are kept in localStorage.
 
 export type Section = 'discussions' | 'challenges' | 'creations'
 export const SECTIONS: { id: Section; label: string; cta: string; newTitle: string }[] = [
@@ -32,6 +37,10 @@ interface Base {
   tags: string[]
   replies: Reply[]
   mine?: boolean
+  /** The signed-in user liked it (likes are stored per account). */
+  likedByMe?: boolean
+  /** Created on this site, not a design sample. */
+  real?: boolean
 }
 export interface Discussion extends Base {
   kind: 'discussions'
@@ -101,46 +110,291 @@ export const TAGS: Record<Section, string[]> = {
 
 // ---- store ----
 const KEY = 'revivemode.community.v1'
-function loadMine(): Post[] {
+function loadLocal(): Post[] {
   try {
     return JSON.parse(localStorage.getItem(KEY) || '[]') as Post[]
   } catch {
     return []
   }
 }
-let mine = loadMine()
-let all: Post[] = [...mine, ...SEED]
+// Without a backend: the user's own posts, kept in this browser.
+let local: Post[] = supabase ? [] : loadLocal()
+// With a backend: posts from the database, newest first.
+let remote: Post[] = []
+let all: Post[] = [...local, ...SEED]
 const subs = new Set<() => void>()
 
+function emit() {
+  all = [...remote, ...local, ...SEED]
+  subs.forEach((l) => l())
+}
+function saveLocal() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(local))
+  } catch {
+    /* ignore */
+  }
+}
+
+const subscribe = (l: () => void) => {
+  subs.add(l)
+  return () => subs.delete(l)
+}
+
 export function usePosts(): Post[] {
-  return useSyncExternalStore(
-    (l) => {
-      subs.add(l)
-      return () => subs.delete(l)
-    },
-    () => all,
-  )
+  return useSyncExternalStore(subscribe, () => all)
 }
 
-export function addPost(p: Post) {
-  mine = [{ ...p, mine: true }, ...mine]
-  all = [...mine, ...SEED]
-  try {
-    localStorage.setItem(KEY, JSON.stringify(mine))
-  } catch {
-    /* ignore */
-  }
-  subs.forEach((l) => l())
+// False until the first load from the database has finished.
+let ready = !supabase
+export const useCommunityReady = () => useSyncExternalStore(subscribe, () => ready)
+
+// ------------------------------------------------------------ from the database
+
+interface ProfileRef {
+  display_name: string
+  avatar_url: string | null
+  level: number
+}
+interface ReplyRow {
+  id: string
+  body: string
+  created_at: string
+  profiles: ProfileRef | null
+}
+interface PostRow {
+  id: string
+  kind: Section
+  user_id: string
+  title: string
+  body: string
+  tags: string[]
+  images: string[]
+  views: number
+  game_title: string | null
+  difficulty: Challenge['difficulty'] | null
+  points: number | null
+  badge_name: string | null
+  rules: string[]
+  created_at: string
+  profiles: ProfileRef | null
+  post_replies: ReplyRow[]
+  post_likes: { count: number }[]
+  challenge_entries: { count: number }[]
 }
 
-export function addReply(postId: string, text: string) {
-  const r: Reply = { id: String(Date.now()), author: 'You', text, ago: 'now', replies: 0, likes: 0 }
-  all = all.map((p) => (p.id === postId ? { ...p, replies: [...p.replies, r] } : p))
-  mine = mine.map((p) => (p.id === postId ? { ...p, replies: [...p.replies, r] } : p))
-  try {
-    localStorage.setItem(KEY, JSON.stringify(mine))
-  } catch {
-    /* ignore */
+const POST_SELECT =
+  'id, kind, user_id, title, body, tags, images, views, game_title, difficulty, points, badge_name, rules, created_at,' +
+  // posts ↔ profiles is linked twice (author, and via post_likes): name the author link.
+  ' profiles!posts_user_id_fkey(display_name, avatar_url, level),' +
+  ' post_replies(id, body, created_at, profiles(display_name, avatar_url, level)),' +
+  ' post_likes(count), challenge_entries(count)'
+
+const authorOf = (p: ProfileRef | null): Author => ({
+  name: p?.display_name ?? 'Player',
+  level: `lvl.${p?.level ?? 1}`,
+  ...(p?.avatar_url ? { avatar: p.avatar_url } : {}),
+})
+
+const dateLabel = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+
+export function timeAgo(iso: string) {
+  let n = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000)
+  const steps: [number, string][] = [[60, 's'], [60, 'min'], [24, 'hrs'], [30, 'days'], [12, 'mon']]
+  for (const [size, unit] of steps) {
+    if (n < size) return unit === 's' ? 'now' : `${Math.floor(n)} ${unit}`
+    n /= size
   }
-  subs.forEach((l) => l())
+  return `${Math.floor(n)} yrs`
+}
+
+function toPost(r: PostRow, me: string | null, liked: Set<string>): Post {
+  const base = {
+    id: r.id,
+    title: r.title,
+    author: authorOf(r.profiles),
+    date: dateLabel(r.created_at),
+    tags: r.tags,
+    replies: [...r.post_replies]
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .map((x) => ({ id: x.id, author: x.profiles?.display_name ?? 'Player', text: x.body, ago: timeAgo(x.created_at), replies: 0, likes: 0 })),
+    mine: r.user_id === me,
+    likedByMe: liked.has(r.id),
+    real: true,
+  }
+  const likes = r.post_likes[0]?.count ?? 0
+  if (r.kind === 'discussions') return { ...base, kind: 'discussions', body: r.body, likes, views: r.views, ...(r.images[0] ? { image: r.images[0] } : {}) }
+  if (r.kind === 'creations') return { ...base, kind: 'creations', body: r.body, likes, images: r.images }
+  return {
+    ...base,
+    kind: 'challenges',
+    game: r.game_title ?? '',
+    platform: gameByTitle(r.game_title ?? '')?.platform ?? '',
+    difficulty: r.difficulty ?? 'EZ',
+    competitors: r.challenge_entries[0]?.count ?? 0,
+    points: r.points ?? 100,
+    badge: { name: r.badge_name ?? 'Pioneer', icon: '/assets/community/trophy.png' },
+    rules: r.rules,
+  }
+}
+
+let loading: Promise<void> | null = null
+
+/** Reload real posts from the database (others' new posts, fresh counts). */
+export function refreshPosts(): Promise<void> {
+  if (!supabase) return Promise.resolve()
+  if (loading) return loading
+  const sb = supabase
+  loading = (async () => {
+    const me = getAuth().session?.user.id ?? null
+    const [posts, likes] = await Promise.all([
+      sb.from('posts').select(POST_SELECT).order('created_at', { ascending: false }).limit(200),
+      me ? sb.from('post_likes').select('post_id').eq('user_id', me) : Promise.resolve({ data: [] as { post_id: string }[], error: null }),
+    ])
+    ready = true
+    if (posts.error) {
+      console.warn('Could not load community posts.', posts.error)
+      return emit()
+    }
+    const liked = new Set((likes.data ?? []).map((l) => l.post_id as string))
+    remote = (posts.data as unknown as PostRow[]).map((r) => toPost(r, me, liked))
+    emit()
+  })().finally(() => {
+    loading = null
+  })
+  return loading
+}
+
+if (supabase) {
+  // "mine" and "liked" depend on who is signed in, so reload on changes.
+  let lastUser: string | null | undefined
+  supabase.auth.onAuthStateChange((_e, session) => {
+    const uid = session?.user.id ?? null
+    if (uid === lastUser) return
+    lastUser = uid
+    setTimeout(() => refreshPosts(), 0)
+  })
+}
+
+// ------------------------------------------------------------------ actions
+
+/** Posting needs an account once the backend is configured. */
+export const canPost = () => !supabase || !!getAuth().session
+
+export type NewPostInput =
+  | { kind: 'discussions'; title: string; body: string; tags: string[] }
+  | { kind: 'creations'; title: string; body: string; tags: string[]; images: File[] }
+  | { kind: 'challenges'; title: string; tags: string[]; game: string; difficulty: Challenge['difficulty']; rules: string[] }
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+async function uploadImages(uid: string, files: File[]) {
+  if (!supabase) return []
+  const urls: string[] = []
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue
+    if (f.size > MAX_IMAGE_BYTES) throw new Error(`${f.name} is larger than 5 MB.`)
+    const ext = (f.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '')
+    const path = `${uid}/${crypto.randomUUID()}.${ext}`
+    const { error } = await supabase.storage.from('creations').upload(path, f, { contentType: f.type })
+    if (error) throw new Error(`Could not upload ${f.name}: ${error.message}`)
+    urls.push(supabase.storage.from('creations').getPublicUrl(path).data.publicUrl)
+  }
+  return urls
+}
+
+/** Publish a post. Resolves to its id, or throws with a readable message. */
+export async function addPost(p: NewPostInput): Promise<string> {
+  // Local prototype: keep it in this browser.
+  if (!supabase) {
+    const base = {
+      id: `${p.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
+      title: p.title,
+      author: { name: 'You', level: 'lvl.1' },
+      date: dateLabel(new Date().toISOString()),
+      tags: p.tags,
+      replies: [],
+      mine: true,
+    }
+    const post: Post =
+      p.kind === 'discussions'
+        ? { ...base, kind: 'discussions', body: p.body, likes: 0, views: 0 }
+        : p.kind === 'creations'
+          ? { ...base, kind: 'creations', body: p.body, likes: 0, images: p.images.map((f) => URL.createObjectURL(f)) }
+          : { ...base, kind: 'challenges', game: p.game, platform: gameByTitle(p.game)?.platform ?? '', difficulty: p.difficulty, competitors: 0, points: 100, badge: { name: 'Pioneer', icon: '/assets/community/trophy.png' }, rules: p.rules }
+    local = [post, ...local]
+    saveLocal()
+    emit()
+    return post.id
+  }
+
+  const uid = getAuth().session?.user.id
+  if (!uid) throw new Error('Sign in to post.')
+  const images = p.kind === 'creations' ? await uploadImages(uid, p.images) : []
+  const row = {
+    kind: p.kind,
+    user_id: uid,
+    title: p.title.slice(0, 80),
+    tags: p.tags,
+    images,
+    body: p.kind === 'challenges' ? '' : p.body,
+    ...(p.kind === 'challenges' ? { game_title: p.game, difficulty: p.difficulty, points: 100, badge_name: 'Pioneer', rules: p.rules } : {}),
+  }
+  const { data, error } = await supabase.from('posts').insert(row).select('id').single()
+  if (error) throw new Error(error.message)
+  await refreshPosts()
+  return data.id as string
+}
+
+/** Reply to a post. Throws with a readable message on failure. */
+export async function addReply(postId: string, text: string) {
+  const post = all.find((p) => p.id === postId)
+  const reply = (author: string, id: string): Reply => ({ id, author, text, ago: 'now', replies: 0, likes: 0 })
+  const appendTo = (list: Post[], r: Reply) => list.map((p) => (p.id === postId ? { ...p, replies: [...p.replies, r] } : p))
+
+  // Design samples and local-prototype posts: replies stay in this browser.
+  if (!supabase || !post?.real) {
+    const r = reply('You', String(Date.now()))
+    if (local.some((p) => p.id === postId)) {
+      local = appendTo(local, r)
+      saveLocal()
+    }
+    all = appendTo(all, r)
+    subs.forEach((l) => l())
+    return
+  }
+
+  const { session, profile } = getAuth()
+  if (!session) throw new Error('Sign in to reply.')
+  const { data, error } = await supabase
+    .from('post_replies')
+    .insert({ post_id: postId, user_id: session.user.id, body: text.slice(0, 4000) })
+    .select('id')
+    .single()
+  if (error) throw new Error(error.message)
+  remote = appendTo(remote, reply(profile?.display_name ?? 'You', data.id as string))
+  emit()
+}
+
+/** Like or unlike a post. Likes on design samples are not stored. */
+export async function toggleLike(postId: string) {
+  const post = all.find((p) => p.id === postId)
+  if (!post || post.kind === 'challenges') return
+  const on = !post.likedByMe
+  const flip = (p: Post): Post => (p.id === postId && p.kind !== 'challenges' ? { ...p, likedByMe: on, likes: p.likes + (on ? 1 : -1) } : p)
+  const uid = getAuth().session?.user.id
+  if (!supabase || !post.real || !uid) {
+    all = all.map(flip)
+    subs.forEach((l) => l())
+    return
+  }
+  remote = remote.map(flip)
+  emit()
+  const { error } = on
+    ? await supabase.from('post_likes').upsert({ post_id: postId, user_id: uid }, { ignoreDuplicates: true })
+    : await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', uid)
+  if (error) {
+    console.warn('Could not save your like.', error)
+    refreshPosts()
+  }
 }

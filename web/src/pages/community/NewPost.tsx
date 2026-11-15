@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useGames } from '../../lib/catalog'
 import { addPost, SECTIONS, type Challenge, type Section } from '../../data/community'
+import { hasBackend } from '../../lib/supabase'
+import { openSignIn, useAuth } from '../../lib/auth'
 import { BackButton, PrimaryButton } from '../NewCollection'
 
 const TOOLS = [
@@ -31,17 +33,24 @@ export default function NewPost() {
   const [preview, setPreview] = useState(false)
   const [difficulty, setDifficulty] = useState<Challenge['difficulty'] | null>(null)
   const [game, setGame] = useState('')
-  const [images, setImages] = useState<string[]>([])
+  const [images, setImages] = useState<{ url: string; file: File }[]>([])
   const [dragging, setDragging] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { session } = useAuth()
+  const needsSignIn = hasBackend && !session
 
   if (!meta) return null
   const ph = PLACEHOLDER[section]
 
   const addImages = (files: FileList | null) => {
     if (!files) return
-    // Local previews only; uploading to storage arrives with the backend.
-    const urls = [...files].filter((f) => f.type.startsWith('image/')).map((f) => URL.createObjectURL(f))
-    setImages((s) => [...s, ...urls])
+    // Previews now; the files upload to storage when the post is published.
+    const picked = [...files].filter((f) => f.type.startsWith('image/'))
+    const tooBig = picked.filter((f) => f.size > 5 * 1024 * 1024)
+    setError(tooBig.length ? `Images must be 5 MB or smaller (${tooBig.map((f) => f.name).join(', ')}).` : null)
+    const ok = picked.filter((f) => f.size <= 5 * 1024 * 1024).map((file) => ({ url: URL.createObjectURL(file), file }))
+    setImages((s) => [...s, ...ok])
   }
 
   const insert = (snippet: string) => {
@@ -54,20 +63,23 @@ export default function NewPost() {
 
   const canPublish = title.trim().length > 2 && (section !== 'challenges' || (difficulty && game)) && (section !== 'creations' || images.length > 0)
 
-  const publish = () => {
-    const base = {
-      id: `${title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
-      title: title.trim(),
-      author: { name: 'You', level: 'lvl.1' },
-      date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-      tags,
-      replies: [],
+  const publish = async () => {
+    if (needsSignIn) return openSignIn()
+    setPublishing(true)
+    setError(null)
+    try {
+      const t = title.trim()
+      const id =
+        section === 'discussions'
+          ? await addPost({ kind: 'discussions', title: t, body: text, tags })
+          : section === 'creations'
+            ? await addPost({ kind: 'creations', title: t, body: text, tags, images: images.map((i) => i.file) })
+            : await addPost({ kind: 'challenges', title: t, tags, game, difficulty: difficulty!, rules: text.split('\n').map((l) => l.replace(/^-\s*/, '').trim()).filter(Boolean) })
+      navigate(`/community/${section}/${id}`, { replace: true })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not publish. Please try again.')
+      setPublishing(false)
     }
-    if (section === 'discussions') addPost({ ...base, kind: 'discussions', body: text, likes: 0, views: 0 })
-    if (section === 'creations') addPost({ ...base, kind: 'creations', body: text, likes: 0, images })
-    if (section === 'challenges')
-      addPost({ ...base, kind: 'challenges', game, platform: allGames.find((g) => g.title === game)?.platform ?? '', difficulty: difficulty!, competitors: 0, points: 100, badge: { name: 'Pioneer', icon: '/assets/community/trophy.png' }, rules: text.split('\n').map((l) => l.replace(/^-\s*/, '').trim()).filter(Boolean) })
-    navigate(`/community/${section}/${base.id}`, { replace: true })
   }
 
   return (
@@ -81,9 +93,16 @@ export default function NewPost() {
               <button type="button" onClick={() => setPreview(false)} className="px-3 font-pixel text-[20px] hover:text-secondary-400">
                 EDIT
               </button>
-              <PrimaryButton type="button" onClick={publish} disabled={!canPublish}>
-                Publish
-              </PrimaryButton>
+              {needsSignIn ? (
+                <PrimaryButton type="button" onClick={openSignIn} className="shrink-0 whitespace-nowrap">
+                  <span className="max-md:hidden">Sign in to publish</span>
+                  <span className="md:hidden">Sign in</span>
+                </PrimaryButton>
+              ) : (
+                <PrimaryButton type="button" onClick={publish} disabled={!canPublish || publishing} className="shrink-0 whitespace-nowrap">
+                  {publishing ? 'Publishing…' : 'Publish'}
+                </PrimaryButton>
+              )}
             </>
           ) : (
             <PrimaryButton type="button" onClick={() => setPreview(true)} disabled={!title.trim()}>
@@ -186,8 +205,20 @@ export default function NewPost() {
           >
             {images.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {images.map((src) => (
-                  <img key={src} src={src} alt="" className="size-20 rounded object-cover" />
+                {images.map((img) => (
+                  <span key={img.url} className="relative">
+                    <img src={img.url} alt="" className="size-20 rounded object-cover" />
+                    {!preview && (
+                      <button
+                        type="button"
+                        aria-label={`Remove ${img.file.name}`}
+                        onClick={() => setImages((s) => s.filter((x) => x !== img))}
+                        className="absolute -right-1.5 -top-1.5 size-5 rounded-full bg-black text-[12px] leading-none hover:bg-primary-500"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </span>
                 ))}
               </div>
             )}
@@ -217,6 +248,11 @@ export default function NewPost() {
         {preview && !canPublish && (
           <p className="text-[14px] text-primary-500">
             {section === 'challenges' ? 'Pick a game and difficulty before publishing.' : section === 'creations' ? 'Add at least one image before publishing.' : 'Add a longer title.'}
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="text-[14px] font-bold text-primary-500">
+            {error}
           </p>
         )}
       </div>

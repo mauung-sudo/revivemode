@@ -95,3 +95,6 @@ export function useFeatured() {
 
 /** Non-hook lookup for event handlers. */
 export const gameById = (id: string) => state.byId.get(id)
+
+/** Non-hook lookup by exact title (community challenges store the title). */
+export const gameByTitle = (title: string) => state.games.find((g) => g.title === title)

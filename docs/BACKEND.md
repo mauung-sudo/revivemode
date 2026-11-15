@@ -15,6 +15,7 @@ Already wired:
 - **Games catalog** reads the `games` table (bundled list as fallback).
 - **Library, collections and Continue playing** sync to the account when signed in.
 - **Settings and the controls key map** sync to `profiles.settings` when signed in.
+- **Community** posts, replies, likes and creation images are stored in Supabase.
 - **Newsletter signup** writes to `newsletter_subscribers` when keys are set.
 - **Sign-in** (`lib/auth.ts`, `components/SignInModal.tsx`): email magic link, plus Google/Discord buttons that appear automatically once those providers are enabled. The navbar shows a Sign in button or the account avatar. Profile → Account Settings edits `profiles.display_name` and has Sign out.
 
@@ -76,8 +77,8 @@ Each step swaps one localStorage store for Supabase, keeping the localStorage pa
 2. ~~**Games catalog:**~~ Done. `lib/catalog.ts` loads the `games` table and falls back to the bundled list. Search still filters in the browser, which is fine for a few hundred games; move it to the `games_search_idx` full-text index when the catalog grows.
 3. ~~**Library + collections + continue playing.**~~ Done. When signed in, `lib/libraryStore.ts` reads and writes `library_items`, `collections`, `collection_games` and `play_sessions`. The first sign-in on a browser with a local library copies it into an empty account, once per account.
 4. ~~**Settings and controls:**~~ Done. `lib/settingsStore.ts` keeps settings and the key map in `profiles.settings`. On sign-in the account copy wins; an empty account takes the browser's settings.
-5. **Community:** posts, replies, likes; creation images upload to the `creations` bucket.
-6. **Game comments and votes.**
+5. ~~**Community:**~~ Done. `data/community.ts` reads and writes `posts`, `post_replies` and `post_likes`; creation images upload to the `creations` bucket (5 MB each). Posting, replying and liking need an account. The design's sample posts still show after real ones and are not stored. Still open: challenge entries, view counts, reply likes, editing and deleting posts.
+6. ~~**Game comments and votes:**~~ Done. `lib/gameComments.ts` reads and writes `game_comments`, `game_comment_likes` and `game_votes` (comments, replies, deleting your own, hearts, 👍/👎 with counts). Writing needs an account. Hearts need migration `20261114000000_game_comment_likes.sql`; until it is applied, comments load with 0 hearts.
 7. **Cloud saves:** EmulatorJS save-state export → `saves` bucket + `save_states`.
 8. **Rooms / netplay:** `rooms` table plus Realtime broadcast for WebRTC signaling. A TURN relay is the first paid item.
 

@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { SortButton, Toolbar } from '../../components/FilterBar'
-import { TAGS, usePosts, type Challenge, type Creation, type Discussion, type Section } from '../../data/community'
+import { refreshPosts, TAGS, usePosts, type Challenge, type Creation, type Discussion, type Section } from '../../data/community'
 import type { SortKey } from '../../lib/gameFilter'
 import { AuthorBadge, GreyCard, Pagination, SectionHeader, Tag } from './shared'
 
@@ -123,6 +123,10 @@ function AuthorBadgeMini({ c }: { c: Creation }) {
 export default function CommunityList() {
   const { section } = useParams() as { section: Section }
   const posts = usePosts()
+  // Pick up other people's new posts each time a section is opened.
+  useEffect(() => {
+    refreshPosts()
+  }, [section])
   const [tab, setTab] = useState(0)
   const [q, setQ] = useState('')
   const [tag, setTag] = useState<string | null>(null)

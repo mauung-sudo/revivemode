@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { addReply, usePosts, type Challenge, type Creation, type Discussion, type Post } from '../../data/community'
+import { addReply, canPost, toggleLike, usePosts, useCommunityReady, type Challenge, type Creation, type Discussion, type Post } from '../../data/community'
+import { openSignIn } from '../../lib/auth'
 import ComingSoon from '../ComingSoon'
 import { Difficulty, Reward } from './CommunityList'
 import { AuthorBadge, GreyCard, ReplyCard, Tag } from './shared'
@@ -19,8 +20,8 @@ function BackLink() {
   )
 }
 
-function Actions({ withReactions = true }: { withReactions?: boolean }) {
-  const [liked, setLiked] = useState(false)
+function Actions({ post, withReactions = true }: { post?: Post; withReactions?: boolean }) {
+  const liked = !!post?.likedByMe
   const [saved, setSaved] = useState(false)
   const [shared, setShared] = useState(false)
   const chip = 'rounded bg-white px-2 py-1 font-pixel text-[14px] leading-none tracking-[0.7px] text-black hover:bg-neutral-50'
@@ -28,7 +29,7 @@ function Actions({ withReactions = true }: { withReactions?: boolean }) {
     <div className="flex items-center gap-2">
       {withReactions && (
         <>
-          <button type="button" aria-pressed={liked} aria-label="Like" onClick={() => setLiked((l) => !l)} className={`rounded-lg bg-white p-1.5 ${liked ? 'ring-2 ring-secondary-500' : ''}`}>
+          <button type="button" aria-pressed={liked} aria-label="Like" onClick={() => (post?.real && !canPost() ? openSignIn() : post && toggleLike(post.id))} className={`rounded-lg bg-white p-1.5 ${liked ? 'ring-2 ring-secondary-500' : ''}`}>
             <img src="/assets/community/thumbs-up.png" alt="" className="pixelated size-6" />
           </button>
           <a href="#replies" aria-label="Replies" className="rounded-lg bg-white p-1.5">
@@ -57,6 +58,8 @@ function Actions({ withReactions = true }: { withReactions?: boolean }) {
 
 function RepliesPanel({ post }: { post: Post }) {
   const [draft, setDraft] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   return (
     <aside id="replies" className="flex min-h-full w-[45%] flex-col bg-[#1d1d1d] max-lg:w-full">
       <h2 className="px-4 pb-4 pt-6 text-[25px] font-bold">Replies({post.replies.length})</h2>
@@ -66,17 +69,32 @@ function RepliesPanel({ post }: { post: Post }) {
         ))}
       </ul>
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault()
-          if (draft.trim()) addReply(post.id, draft.trim())
-          setDraft('')
+          if (!draft.trim() || sending) return
+          if (post.real && !canPost()) return openSignIn()
+          setSending(true)
+          setError(null)
+          try {
+            await addReply(post.id, draft.trim())
+            setDraft('')
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Could not send your reply.')
+          } finally {
+            setSending(false)
+          }
         }}
-        className="sticky bottom-0 flex gap-2 bg-[#1d1d1d] p-4"
+        className="sticky bottom-0 flex flex-wrap gap-2 bg-[#1d1d1d] p-4"
       >
-        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Join the conversation" className="min-w-0 flex-1 rounded-lg bg-neutral-700 px-3 py-2.5 text-[14px] font-bold placeholder:text-white focus:outline-none focus:ring-1 focus:ring-secondary-500" />
-        <button type="submit" aria-label="Send reply" className="rounded-lg bg-white p-2">
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={post.real && !canPost() ? 'Sign in to join the conversation' : 'Join the conversation'} aria-label="Reply" className="min-w-0 flex-1 rounded-lg bg-neutral-700 px-3 py-2.5 text-[14px] font-bold placeholder:text-white focus:outline-none focus:ring-1 focus:ring-secondary-500" />
+        <button type="submit" aria-label="Send reply" disabled={sending} className="rounded-lg bg-white p-2 disabled:opacity-50">
           <img src="/assets/community/chat.webp" alt="" className="pixelated size-6" />
         </button>
+        {error && (
+          <p role="alert" className="w-full text-[13px] font-bold text-primary-500">
+            {error}
+          </p>
+        )}
       </form>
     </aside>
   )
@@ -97,7 +115,7 @@ function DiscussionBody({ d }: { d: Discussion }) {
           <span className="shrink-0 text-[12px] text-neutral-50">{d.date}</span>
         </div>
       </GreyCard>
-      <Actions />
+      <Actions post={d} />
       <p className="mt-4 text-[18px] leading-[30px]">{d.body}</p>
       {d.image && <img src={d.image} alt="" className="w-[260px] max-w-full rounded" />}
     </>
@@ -118,7 +136,7 @@ function CreationBody({ c }: { c: Creation }) {
           <span>{c.date}</span>
         </div>
       </GreyCard>
-      <Actions />
+      <Actions post={c} />
       <div className="relative mt-4">
         <img src={c.images[i]} alt={`${c.title}, image ${i + 1}`} className="aspect-[328/190] w-full rounded object-cover" />
         {c.images.length > 1 && (
@@ -190,6 +208,8 @@ function ChallengeBody({ c }: { c: Challenge }) {
 export default function PostDetail() {
   const { section, id } = useParams()
   const post = usePosts().find((p) => p.kind === section && p.id === id)
+  const ready = useCommunityReady()
+  if (!post && !ready) return <p className="px-4 py-16 text-center font-pixel text-[24px]">Loading…</p>
   if (!post) return <ComingSoon />
   const twoCol = post.kind !== 'challenges'
 

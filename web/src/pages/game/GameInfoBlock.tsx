@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { MockGame } from '../../data/games'
 import { gameInfo } from '../../data/gameDetails'
+import { setVote, useGameThread } from '../../lib/gameComments'
 import { library, useLibrary } from '../../lib/libraryStore'
 import { systemForPlatform } from './platformCore'
 
@@ -37,23 +37,25 @@ export function PlayButton({ to }: { to: string }) {
   )
 }
 
-function Like() {
-  const [vote, setVote] = useState<0 | 1 | -1>(0)
+function Like({ game }: { game: MockGame }) {
+  const { myVote: vote, up, down } = useGameThread(game.id, game.title)
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[16px] font-bold">Like this game?</p>
-      <div className="flex gap-2">
+      <div className="flex gap-3">
         {([1, -1] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            aria-pressed={vote === v}
-            aria-label={v === 1 ? 'Like' : 'Dislike'}
-            onClick={() => setVote(vote === v ? 0 : v)}
-            className={`relative size-[51px] rounded-full transition ${vote === v ? 'scale-110 ring-2 ring-white' : vote ? 'opacity-50' : ''}`}
-          >
-            <img src={v === 1 ? '/assets/game/like.svg' : '/assets/game/dislike.svg'} alt="" width={51} height={51} />
-          </button>
+          <div key={v} className="flex flex-col items-center gap-1">
+            <button
+              type="button"
+              aria-pressed={vote === v}
+              aria-label={v === 1 ? 'Like' : 'Dislike'}
+              onClick={() => setVote(game.id, vote === v ? 0 : v)}
+              className={`relative size-[51px] rounded-full transition ${vote === v ? 'scale-110 ring-2 ring-white' : vote ? 'opacity-50' : ''}`}
+            >
+              <img src={v === 1 ? '/assets/game/like.svg' : '/assets/game/dislike.svg'} alt="" width={51} height={51} />
+            </button>
+            <span className="text-[12px] text-neutral-400">{v === 1 ? up : down}</span>
+          </div>
         ))}
       </div>
     </div>
@@ -88,7 +90,7 @@ export default function GameInfoBlock({ game, showPlay = true }: { game: MockGam
               </div>
             ))}
           </dl>
-          <Like />
+          <Like game={game} />
         </aside>
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <div className="flex flex-wrap items-center gap-3">

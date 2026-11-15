@@ -68,6 +68,8 @@ if (supabase) {
 }
 
 export const useAuth = () => useSyncExternalStore(subscribe, () => state)
+/** Current sign-in state outside React (event handlers, stores). */
+export const getAuth = () => state
 
 export const openSignIn = () => set({ modalOpen: true })
 export const closeSignIn = () => set({ modalOpen: false })

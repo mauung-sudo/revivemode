@@ -91,10 +91,10 @@ const KEYMAP: [string, string][] = [
   ['D-pad down', 'down'],
   ['D-pad left', 'left'],
   ['D-pad right', 'right'],
-  ['A', 'X'],
-  ['B', 'Z'],
-  ['SELECT', 'SHIFT'],
-  ['START', 'ENTER'],
+  ['A', 'A'],
+  ['B', 'B'],
+  ['SELECT', 'SELECT'],
+  ['START', 'START'],
 ]
 
 function EmulatorSettings({ s, set, q }: { s: Settings; set: (p: Partial<Settings>) => void; q: string }) {
@@ -151,10 +151,10 @@ function EmulatorSettings({ s, set, q }: { s: Settings; set: (p: Partial<Setting
               </tr>
             </thead>
             <tbody>
-              {KEYMAP.map(([a, k]) => (
+              {KEYMAP.map(([a, btn]) => (
                 <tr key={a} className="border-t border-neutral-700">
                   <td className="px-3 py-2">{a}</td>
-                  <td className="px-3 py-2 text-right">{k}</td>
+                  <td className="px-3 py-2 text-right">{s.controls[btn] ?? DEFAULT_SETTINGS.controls[btn]}</td>
                 </tr>
               ))}
             </tbody>
