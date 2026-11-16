@@ -7,7 +7,26 @@
     <style>
       html, body { margin: 0; height: 100%; background: #000; }
       #game { width: 100%; height: 100%; }
+      .rm-toast {
+        position: fixed; top: 12px; left: 50%; z-index: 9999;
+        display: flex; align-items: center; gap: 12px;
+        max-width: calc(100% - 32px); padding: 10px 16px 10px 10px;
+        background: #1d1d1d; color: #fff; border: 2px solid #7c5cff; border-radius: 10px;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+        font-family: 'VT323', ui-monospace, monospace;
+        transform: translate(-50%, -140%); transition: transform 0.35s ease;
+        pointer-events: none;
+      }
+      .rm-toast-in { transform: translate(-50%, 0); }
+      .rm-toast-badge {
+        flex: none; display: grid; place-items: center; width: 44px; height: 44px;
+        background: #7c5cff; border-radius: 8px; font-size: 28px; line-height: 1;
+      }
+      .rm-toast-label { font-size: 15px; letter-spacing: 1.5px; color: #b9a8ff; }
+      .rm-toast-title { font-size: 24px; line-height: 1.1; }
+      .rm-toast-desc { font-size: 17px; color: #d4d4d4; }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="game"></div>
@@ -29,7 +48,10 @@
         window.EJS_pathtodata = EJS_CDN
         window.EJS_color = '#7c5cff'
         window.EJS_startOnLoaded = true
-        window.EJS_onGameStart = () => setTimeout(applySettings, 0)
+        window.EJS_onGameStart = () => {
+          setTimeout(applySettings, 0)
+          startAchievements()
+        }
         const s = document.createElement('script')
         s.src = EJS_CDN + 'loader.js'
         document.body.appendChild(s)
@@ -123,6 +145,126 @@
       window.addEventListener('storage', (e) => {
         if (e.key === SETTINGS_KEY) applySettings()
       })
+
+      // ---------------------------------------------------------------
+      // Achievements. A set lives in /achievements/<game>.json and only runs
+      // for the exact hosted file it was written for (a user's own ROM may be
+      // a different version with different addresses). Game memory is read
+      // from the EmulatorJS save-state snapshot: `snapshot.wramStart` is where
+      // Game Boy address C000 sits in that snapshot for this core and game.
+      // Unlocks are saved in localStorage (revivemode.achievements.v1) and
+      // posted to the parent page.
+      const ACH_KEY = 'revivemode.achievements.v1'
+      const ACH_POLL_MS = 250
+
+      function readUnlocks() {
+        try {
+          return JSON.parse(localStorage.getItem(ACH_KEY) || '{}')
+        } catch {
+          return {}
+        }
+      }
+
+      function readValue(state, start, trigger) {
+        const off = start + (parseInt(trigger.address, 16) - 0xc000)
+        if (trigger.format === 'bcd5le') {
+          // µCity money: 5 bytes, two decimal digits per byte, lowest byte first.
+          let v = 0
+          for (let i = 4; i >= 0; i--) {
+            const b = state[off + i]
+            v = v * 100 + (b >> 4) * 10 + (b & 15)
+          }
+          return v
+        }
+        return state[off] // u8
+      }
+
+      function compare(v, op, target) {
+        switch (op) {
+          case '>=': return v >= target
+          case '>': return v > target
+          case '==': return v === target
+          case '<=': return v <= target
+          case '<': return v < target
+          default: return false
+        }
+      }
+
+      async function startAchievements() {
+        const gameId = params.get('game')
+        if (!gameId || !/^[a-z0-9-]+$/.test(gameId)) return
+        let set
+        try {
+          const res = await fetch(`/achievements/${gameId}.json`)
+          if (!res.ok) return
+          set = await res.json()
+        } catch {
+          return
+        }
+        const emu = window.EJS_emulator
+        const gm = emu && emu.gameManager
+        if (!gm || set.file !== url || emu.getCore() !== set.core) return
+
+        // If the core's snapshot layout ever changes (e.g. a new EmulatorJS
+        // version), our offsets would point at the wrong bytes: switch off
+        // rather than unlock things by accident.
+        const first = gm.getState()
+        if (!first || first.length !== set.snapshot.bytes) {
+          console.warn('[achievements] snapshot layout changed; achievements off for', gameId)
+          return
+        }
+
+        const unlocked = readUnlocks()[gameId] || {}
+        // An achievement only fires after its condition has been false at
+        // least once this session, so boot-time memory or loading a save that
+        // already meets it doesn't hand it out instantly.
+        const pending = set.achievements
+          .filter((a) => !unlocked[a.id])
+          .map((a) => ({ ...a, armed: false }))
+        if (!pending.length) return
+
+        const timer = setInterval(() => {
+          if (emu.paused) return
+          const state = gm.getState()
+          for (const a of pending) {
+            if (a.done) continue
+            const met = compare(readValue(state, set.snapshot.wramStart, a.trigger), a.trigger.op, a.trigger.value)
+            if (!met) a.armed = true
+            else if (a.armed) {
+              a.done = true
+              unlock(gameId, a)
+            }
+          }
+          if (pending.every((a) => a.done)) clearInterval(timer)
+        }, ACH_POLL_MS)
+      }
+
+      function unlock(gameId, a) {
+        const all = readUnlocks()
+        all[gameId] = { ...(all[gameId] || {}), [a.id]: new Date().toISOString() }
+        try {
+          localStorage.setItem(ACH_KEY, JSON.stringify(all))
+        } catch {
+          /* storage blocked: still show the pop-up */
+        }
+        parent.postMessage({ type: 'revivemode:achievement', gameId, id: a.id }, location.origin)
+        showToast(a)
+      }
+
+      function showToast(a) {
+        const el = document.createElement('div')
+        el.className = 'rm-toast'
+        el.setAttribute('role', 'status')
+        el.innerHTML = '<div class="rm-toast-badge">★</div><div><div class="rm-toast-label">ACHIEVEMENT UNLOCKED</div><div class="rm-toast-title"></div><div class="rm-toast-desc"></div></div>'
+        el.querySelector('.rm-toast-title').textContent = `${a.title} · ${a.points} pts`
+        el.querySelector('.rm-toast-desc').textContent = a.description
+        document.body.appendChild(el)
+        requestAnimationFrame(() => el.classList.add('rm-toast-in'))
+        setTimeout(() => {
+          el.classList.remove('rm-toast-in')
+          setTimeout(() => el.remove(), 400)
+        }, 5000)
+      }
 
       document.addEventListener('visibilitychange', () => {
         const emu = window.EJS_emulator

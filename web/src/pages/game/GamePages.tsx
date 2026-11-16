@@ -127,7 +127,14 @@ export function GamePlayer() {
         <div ref={shell} className={`relative flex w-[913px] max-w-full flex-col rounded-t-2xl bg-[#1d1d1d] ${focus ? 'z-50' : ''}`}>
           <div className="relative flex aspect-[913/577] w-full items-center justify-center overflow-hidden rounded-t-2xl [:fullscreen_&]:aspect-auto [:fullscreen_&]:flex-1">
             {source ? (
-              <EmulatorFrame core={system?.core ?? 'nes'} gameUrl={source.url} gameName={source.name} bare />
+              <EmulatorFrame
+                core={system?.core ?? 'nes'}
+                gameUrl={source.url}
+                gameName={source.name}
+                // Achievements only for our hosted file: a user's own ROM may be a different version.
+                gameId={source.url === game.file ? game.id : undefined}
+                bare
+              />
             ) : (
               <>
                 <img src={game.id === 'super-mario-bros' ? '/assets/game/player-thumb.png' : game.cover} alt="" className="absolute inset-0 size-full object-contain" />

@@ -1,0 +1,18 @@
+{
+  "gameId": "ucity",
+  "file": "/games/ucity.gbc",
+  "core": "gambatte",
+  "snapshot": {
+    "bytes": 182512,
+    "wramStart": 149715
+  },
+  "achievements": [
+    {
+      "id": "nest-egg",
+      "title": "Nest Egg",
+      "description": "Grow your city's funds to 50,000.",
+      "points": 10,
+      "trigger": { "address": "C565", "format": "bcd5le", "op": ">=", "value": 50000 }
+    }
+  ]
+}
