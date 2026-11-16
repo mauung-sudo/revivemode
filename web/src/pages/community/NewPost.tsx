@@ -7,10 +7,10 @@ import { openSignIn, useAuth } from '../../lib/auth'
 import { BackButton, PrimaryButton } from '../NewCollection'
 
 const TOOLS = [
-  { label: 'List', icon: '/assets/community/ic-list.svg', insert: '\n- ' },
-  { label: 'Image', icon: '/assets/community/ic-image.svg', insert: '\n![image](url)' },
-  { label: 'Video', icon: '/assets/community/ic-video.svg', insert: '\n[video](url)' },
-  { label: 'Link', icon: '/assets/community/ic-link.svg', insert: '[text](url)' },
+  { label: 'List', icon: '/assets/community/toolbar/list.svg', insert: '\n- ' },
+  { label: 'Image', icon: '/assets/community/toolbar/image.svg', insert: '\n![image](url)' },
+  { label: 'Video', icon: '/assets/community/toolbar/video.svg', insert: '\n[video](url)' },
+  { label: 'Link', icon: '/assets/community/toolbar/link.svg', insert: '[text](url)' },
 ]
 const DIFFICULTIES: Challenge['difficulty'][] = ['EZ', 'Medium', 'Hard', 'Extreme']
 const PLACEHOLDER: Record<Section, { title: string; body: string }> = {
@@ -112,14 +112,18 @@ export default function NewPost() {
         </div>
 
         {!preview && (
-          <div className="flex items-center rounded-lg bg-neutral-700 px-2 py-1.5 text-[12px] shadow-[inset_0_-2px_0_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.4)]">
-            <span className="flex flex-1 items-center gap-1 border-r border-neutral-500">
-              <img src="/assets/community/ic-text.svg" alt="" className="h-3.5" /> Title text
+          // Create toolbar (Figma 319:5195).
+          <div className="relative flex items-center justify-between rounded-[8px] bg-neutral-800 px-2 py-1 shadow-[0_0_8px_black,0_0_4px_rgba(255,255,255,0.07),inset_0_-2px_0_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.4)]">
+            <span className="flex flex-1 items-center gap-1 overflow-clip rounded-[4px] p-1 text-[12px] text-white">
+              <img src="/assets/community/toolbar/text.svg" alt="" width={16} height={16} /> Title text
             </span>
-            <span className="flex flex-1 justify-end gap-4">
+            <span aria-hidden className="flex h-[33px] w-0 shrink-0 items-center justify-center">
+              <img src="/assets/community/toolbar/divider.svg" alt="" width={33} height={1} className="max-w-none rotate-90" />
+            </span>
+            <span className="flex flex-1 items-center justify-end gap-1">
               {TOOLS.map((t) => (
-                <button key={t.label} type="button" onClick={() => insert(t.insert)} className="flex items-center gap-1 hover:text-secondary-400">
-                  <img src={t.icon} alt="" className="size-4" /> {t.label}
+                <button key={t.label} type="button" onClick={() => insert(t.insert)} className="flex items-center gap-2 overflow-clip rounded-[4px] p-1 text-[12px] text-neutral-50 hover:bg-neutral-700">
+                  <img src={t.icon} alt="" width={16} height={16} /> {t.label}
                 </button>
               ))}
             </span>

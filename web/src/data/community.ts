@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { getAuth } from '../lib/auth'
+import { getAuth, openSignIn } from '../lib/auth'
 import { gameByTitle } from '../lib/catalog'
 import { supabase } from '../lib/supabase'
 
@@ -24,10 +24,15 @@ export interface Author {
 export interface Reply {
   id: string
   author: string
+  avatar?: string
   text: string
   ago: string
   replies: number
   likes: number
+  likedByMe?: boolean
+  mine?: boolean
+  /** Stored in the database (not a design sample or a local reply). */
+  real?: boolean
 }
 interface Base {
   id: string
@@ -87,7 +92,7 @@ const ART_REPLIES: Reply[] = [
   { id: 'a3', author: 'RetroGamer23', text: 'This artwork brings back so many happy memories. Thank you for sharing your talent with us!', ago: '10 mon', replies: 10, likes: 12 },
 ]
 
-const SEED: Post[] = [
+let SEED: Post[] = [
   { kind: 'discussions', id: 'favorite-mario-soundtrack', title: 'Favorite Mario sound track', author: A.playerOneX, date: '12th June, 2023', tags: ['MarioMusic', 'Soundtracks', 'Nostalgia'], likes: 67, views: 110, replies: REPLIES, body: 'Mario games have always been known for their catchy and memorable music. Which Mario game has the best soundtrack in your opinion? Is there a specific track that stands out for you?', image: '/assets/community/mario-music.webp' },
   { kind: 'discussions', id: 'easter-eggs-mgs1', title: 'Easter eggs in Metal gear solid 1', author: A.proGod, date: '12th June, 2023', tags: ['eastereggs', 'tips'], likes: 67, views: 110, replies: REPLIES.slice(0, 2), body: 'Share your favorite hidden secrets and easter eggs from the original Metal Gear Solid.' },
   { kind: 'discussions', id: 'recommendations-for-beginners', title: 'Game recommendations for beginners', author: A.ninja, date: '12th June, 2023', tags: ['retrogamegems', 'gamereviews', 'recommended'], likes: 67, views: 110, replies: REPLIES.slice(1), body: 'New to retro games? Post the titles you would hand to someone picking up a controller for the first time.' },
@@ -158,9 +163,11 @@ interface ProfileRef {
 }
 interface ReplyRow {
   id: string
+  user_id: string
   body: string
   created_at: string
   profiles: ProfileRef | null
+  post_reply_likes?: { count: number }[]
 }
 interface PostRow {
   id: string
@@ -183,11 +190,12 @@ interface PostRow {
   challenge_entries: { count: number }[]
 }
 
-const POST_SELECT =
+const postSelect = (replyLikes: boolean) =>
   'id, kind, user_id, title, body, tags, images, views, game_title, difficulty, points, badge_name, rules, created_at,' +
   // posts ↔ profiles is linked twice (author, and via post_likes): name the author link.
   ' profiles!posts_user_id_fkey(display_name, avatar_url, level),' +
-  ' post_replies(id, body, created_at, profiles(display_name, avatar_url, level)),' +
+  // post_replies ↔ profiles is linked twice once reply likes exist: name the author link.
+  ` post_replies(id, user_id, body, created_at, profiles!post_replies_user_id_fkey(display_name, avatar_url, level)${replyLikes ? ', post_reply_likes(count)' : ''}),` +
   ' post_likes(count), challenge_entries(count)'
 
 const authorOf = (p: ProfileRef | null): Author => ({
@@ -208,7 +216,13 @@ export function timeAgo(iso: string) {
   return `${Math.floor(n)} yrs`
 }
 
-function toPost(r: PostRow, me: string | null, liked: Set<string>): Post {
+interface Mine {
+  liked: Set<string> // post ids
+  likedReplies: Set<string> // reply ids
+  entries: Set<string> // challenge post ids I entered
+}
+
+function toPost(r: PostRow, me: string | null, m: Mine): Post {
   const base = {
     id: r.id,
     title: r.title,
@@ -217,9 +231,20 @@ function toPost(r: PostRow, me: string | null, liked: Set<string>): Post {
     tags: r.tags,
     replies: [...r.post_replies]
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
-      .map((x) => ({ id: x.id, author: x.profiles?.display_name ?? 'Player', text: x.body, ago: timeAgo(x.created_at), replies: 0, likes: 0 })),
+      .map<Reply>((x) => ({
+        id: x.id,
+        author: x.profiles?.display_name ?? 'Player',
+        ...(x.profiles?.avatar_url ? { avatar: x.profiles.avatar_url } : {}),
+        text: x.body,
+        ago: timeAgo(x.created_at),
+        replies: 0,
+        likes: x.post_reply_likes?.[0]?.count ?? 0,
+        likedByMe: m.likedReplies.has(x.id),
+        mine: x.user_id === me,
+        real: true,
+      })),
     mine: r.user_id === me,
-    likedByMe: liked.has(r.id),
+    likedByMe: m.liked.has(r.id),
     real: true,
   }
   const likes = r.post_likes[0]?.count ?? 0
@@ -235,6 +260,7 @@ function toPost(r: PostRow, me: string | null, liked: Set<string>): Post {
     points: r.points ?? 100,
     badge: { name: r.badge_name ?? 'Pioneer', icon: '/assets/community/trophy.png' },
     rules: r.rules,
+    completed: m.entries.has(r.id),
   }
 }
 
@@ -247,17 +273,29 @@ export function refreshPosts(): Promise<void> {
   const sb = supabase
   loading = (async () => {
     const me = getAuth().session?.user.id ?? null
-    const [posts, likes] = await Promise.all([
-      sb.from('posts').select(POST_SELECT).order('created_at', { ascending: false }).limit(200),
-      me ? sb.from('post_likes').select('post_id').eq('user_id', me) : Promise.resolve({ data: [] as { post_id: string }[], error: null }),
+    const fetchPosts = (replyLikes: boolean) => sb.from('posts').select(postSelect(replyLikes)).order('created_at', { ascending: false }).limit(200)
+    const none = Promise.resolve({ data: [] as Record<string, string>[], error: null })
+    let [posts, likes, replyLikes, entries] = await Promise.all([
+      fetchPosts(true),
+      me ? sb.from('post_likes').select('post_id').eq('user_id', me) : none,
+      me ? sb.from('post_reply_likes').select('reply_id').eq('user_id', me) : none,
+      me ? sb.from('challenge_entries').select('post_id').eq('user_id', me) : none,
     ])
+    // Before migration 20261116000000_community_extras is applied there are
+    // no reply likes: load posts without them rather than not at all.
+    if (posts.error) posts = await fetchPosts(false)
     ready = true
     if (posts.error) {
       console.warn('Could not load community posts.', posts.error)
       return emit()
     }
-    const liked = new Set((likes.data ?? []).map((l) => l.post_id as string))
-    remote = (posts.data as unknown as PostRow[]).map((r) => toPost(r, me, liked))
+    const ids = (rows: unknown, key: string) => new Set(((rows ?? []) as Record<string, string>[]).map((x) => x[key]))
+    const m: Mine = {
+      liked: ids(likes.data, 'post_id'),
+      likedReplies: replyLikes.error ? new Set() : ids(replyLikes.data, 'reply_id'),
+      entries: ids(entries.data, 'post_id'),
+    }
+    remote = (posts.data as unknown as PostRow[]).map((r) => toPost(r, me, m))
     emit()
   })().finally(() => {
     loading = null
@@ -349,19 +387,13 @@ export async function addPost(p: NewPostInput): Promise<string> {
 /** Reply to a post. Throws with a readable message on failure. */
 export async function addReply(postId: string, text: string) {
   const post = all.find((p) => p.id === postId)
-  const reply = (author: string, id: string): Reply => ({ id, author, text, ago: 'now', replies: 0, likes: 0 })
+  const reply = (author: string, id: string, real = false): Reply => ({ id, author, text, ago: 'now', replies: 0, likes: 0, mine: true, real })
   const appendTo = (list: Post[], r: Reply) => list.map((p) => (p.id === postId ? { ...p, replies: [...p.replies, r] } : p))
 
   // Design samples and local-prototype posts: replies stay in this browser.
   if (!supabase || !post?.real) {
     const r = reply('You', String(Date.now()))
-    if (local.some((p) => p.id === postId)) {
-      local = appendTo(local, r)
-      saveLocal()
-    }
-    all = appendTo(all, r)
-    subs.forEach((l) => l())
-    return
+    return patchEverywhere((l) => appendTo(l, r))
   }
 
   const { session, profile } = getAuth()
@@ -372,7 +404,7 @@ export async function addReply(postId: string, text: string) {
     .select('id')
     .single()
   if (error) throw new Error(error.message)
-  remote = appendTo(remote, reply(profile?.display_name ?? 'You', data.id as string))
+  remote = appendTo(remote, reply(profile?.display_name ?? 'You', data.id as string, true))
   emit()
 }
 
@@ -384,8 +416,7 @@ export async function toggleLike(postId: string) {
   const flip = (p: Post): Post => (p.id === postId && p.kind !== 'challenges' ? { ...p, likedByMe: on, likes: p.likes + (on ? 1 : -1) } : p)
   const uid = getAuth().session?.user.id
   if (!supabase || !post.real || !uid) {
-    all = all.map(flip)
-    subs.forEach((l) => l())
+    patchEverywhere((l) => l.map(flip))
     return
   }
   remote = remote.map(flip)
@@ -397,4 +428,154 @@ export async function toggleLike(postId: string) {
     console.warn('Could not save your like.', error)
     refreshPosts()
   }
+}
+
+// ------------------------------------------------------- leftovers: replies
+
+const mapReply = (list: Post[], postId: string, fn: (r: Reply) => Reply | null): Post[] =>
+  list.map((p) => (p.id === postId ? { ...p, replies: p.replies.map(fn).filter((r): r is Reply => r !== null) } : p))
+
+function patchEverywhere(fn: (list: Post[]) => Post[]) {
+  remote = fn(remote)
+  if (local.length) {
+    local = fn(local)
+    saveLocal()
+  }
+  SEED = fn(SEED) // design samples: changes last until the page reloads
+  emit()
+}
+
+/** Like or unlike a reply. Hearts on sample or local replies stay on this page. */
+export async function toggleReplyLike(postId: string, replyId: string) {
+  const reply = all.find((p) => p.id === postId)?.replies.find((r) => r.id === replyId)
+  if (!reply) return
+  const on = !reply.likedByMe
+  patchEverywhere((l) => mapReply(l, postId, (r) => (r.id === replyId ? { ...r, likedByMe: on, likes: r.likes + (on ? 1 : -1) } : r)))
+  const uid = getAuth().session?.user.id
+  if (!supabase || !reply.real) return
+  if (!uid) return openSignIn()
+  const { error } = on
+    ? await supabase.from('post_reply_likes').upsert({ reply_id: replyId, user_id: uid }, { ignoreDuplicates: true })
+    : await supabase.from('post_reply_likes').delete().eq('reply_id', replyId).eq('user_id', uid)
+  if (error) {
+    console.warn('Could not save the like.', error)
+    refreshPosts()
+  }
+}
+
+/** Delete one of your own replies. */
+export async function deleteReply(postId: string, replyId: string) {
+  const reply = all.find((p) => p.id === postId)?.replies.find((r) => r.id === replyId)
+  if (!reply?.mine) return
+  if (supabase && reply.real) {
+    const { error } = await supabase.from('post_replies').delete().eq('id', replyId)
+    if (error) throw new Error(error.message)
+  }
+  patchEverywhere((l) => mapReply(l, postId, (r) => (r.id === replyId ? null : r)))
+}
+
+// --------------------------------------------------------- leftovers: posts
+
+export interface PostEdit {
+  title: string
+  body?: string
+  tags?: string[]
+  rules?: string[]
+}
+
+/** Edit your own post's title, text, tags or rules. */
+export async function updatePost(id: string, edit: PostEdit) {
+  const post = all.find((p) => p.id === id)
+  if (!post?.mine) throw new Error('You can only edit your own posts.')
+  const title = edit.title.trim().slice(0, 80)
+  if (title.length < 3) throw new Error('The title needs at least 3 characters.')
+  const patch = (p: Post): Post => (p.id !== id ? p : ({ ...p, title, ...(edit.tags ? { tags: edit.tags } : {}), ...(edit.body !== undefined && p.kind !== 'challenges' ? { body: edit.body } : {}), ...(edit.rules && p.kind === 'challenges' ? { rules: edit.rules } : {}) } as Post))
+  if (supabase && post.real) {
+    const row: Record<string, unknown> = { title }
+    if (edit.tags) row.tags = edit.tags
+    if (edit.body !== undefined && post.kind !== 'challenges') row.body = edit.body
+    if (edit.rules && post.kind === 'challenges') row.rules = edit.rules
+    const { error } = await supabase.from('posts').update(row).eq('id', id)
+    if (error) throw new Error(error.message)
+  }
+  patchEverywhere((l) => l.map(patch))
+}
+
+/** Delete your own post (and its replies, likes and entries). */
+export async function deletePost(id: string) {
+  const post = all.find((p) => p.id === id)
+  if (!post?.mine) throw new Error('You can only delete your own posts.')
+  if (supabase && post.real) {
+    const { error } = await supabase.from('posts').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+  }
+  patchEverywhere((l) => l.filter((p) => p.id !== id))
+}
+
+/** Count a view once per post per browser session. */
+export function countView(id: string) {
+  const post = all.find((p) => p.id === id)
+  if (!post || post.kind !== 'discussions') return
+  const key = `revivemode.viewed.${id}`
+  try {
+    if (sessionStorage.getItem(key)) return
+    sessionStorage.setItem(key, '1')
+  } catch {
+    /* storage blocked: still count it */
+  }
+  patchEverywhere((l) => l.map((p) => (p.id === id && p.kind === 'discussions' ? { ...p, views: p.views + 1 } : p)))
+  if (supabase && post.real) {
+    supabase.rpc('bump_post_view', { pid: id }).then(({ error }) => error && console.warn('Could not count the view.', error))
+  }
+}
+
+// ---------------------------------------------------- leftovers: challenges
+
+export interface Entry {
+  id: string
+  user: string
+  avatar?: string
+  score: number | null
+  proofUrl: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  mine: boolean
+}
+
+/** Entries for a challenge, best score first. */
+export async function loadEntries(postId: string): Promise<Entry[]> {
+  const post = all.find((p) => p.id === postId)
+  if (!supabase || !post?.real) return []
+  const me = getAuth().session?.user.id ?? null
+  const { data, error } = await supabase
+    .from('challenge_entries')
+    .select('id, user_id, score, proof_url, status, created_at, profiles(display_name, avatar_url)')
+    .eq('post_id', postId)
+    .order('score', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: true })
+    .limit(100)
+  if (error) throw new Error(error.message)
+  return (data as unknown as { id: string; user_id: string; score: number | null; proof_url: string | null; status: Entry['status']; profiles: { display_name: string; avatar_url: string | null } | null }[]).map((r) => ({
+    id: r.id,
+    user: r.profiles?.display_name ?? 'Player',
+    ...(r.profiles?.avatar_url ? { avatar: r.profiles.avatar_url } : {}),
+    score: r.score,
+    proofUrl: r.proof_url,
+    status: r.status,
+    mine: r.user_id === me,
+  }))
+}
+
+/** Submit your result for a challenge (one entry per player; it starts as pending). */
+export async function submitEntry(postId: string, score: number | null, proofUrl: string) {
+  const post = all.find((p) => p.id === postId)
+  if (!post || post.kind !== 'challenges') return
+  const url = proofUrl.trim()
+  if (url && !/^https?:\/\//i.test(url)) throw new Error('The proof link should start with http:// or https://')
+  const mark = (l: Post[]) => l.map((p) => (p.id === postId && p.kind === 'challenges' ? { ...p, completed: true, competitors: p.competitors + (p.completed ? 0 : 1) } : p))
+  if (!supabase || !post.real) return patchEverywhere(mark) // samples: this page only
+  const uid = getAuth().session?.user.id
+  if (!uid) throw new Error('Sign in to submit results.')
+  const { error } = await supabase.from('challenge_entries').insert({ post_id: postId, user_id: uid, score, proof_url: url || null })
+  if (error) throw new Error(error.code === '23505' ? 'You already submitted results for this challenge.' : error.message)
+  patchEverywhere(mark)
 }

@@ -1,22 +1,50 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Avatar from '../../components/Avatar'
-import { SECTIONS, type Author, type Reply, type Section } from '../../data/community'
+import { deleteReply, SECTIONS, toggleReplyLike, type Author, type Reply, type Section } from '../../data/community'
 
 export function AuthorBadge({ author, size = 40 }: { author: Author; size?: number }) {
   return (
     <div className="flex items-center gap-2">
       {author.avatar ? (
-        <img src={author.avatar} alt="" className="shrink-0 rounded object-cover" style={{ width: size, height: size }} />
+        <img src={author.avatar} alt="" className="shrink-0 rounded-[4px] object-cover" style={{ width: size, height: size }} />
       ) : (
         <Avatar size={size} />
       )}
-      <div className="leading-tight">
-        <p className="text-[16px] font-bold">{author.name}</p>
-        <p className="text-[12px] text-neutral-400">{author.level}</p>
+      <div className="flex flex-col gap-1">
+        <p className="text-[16px] font-bold leading-4 tracking-[0.064px]">{author.name}</p>
+        <p className="text-[14px] text-[#666]">{author.level}</p>
       </div>
     </div>
   )
+}
+
+// Post page author (Figma "avatar" + "polygon up"): big avatar, name and level,
+// with a pointer under the avatar aimed at the post card below.
+export function PostAuthor({ author }: { author: Author }) {
+  return (
+    <div className="flex flex-col items-start gap-4 px-2">
+      <div className="flex items-start gap-2">
+        {author.avatar ? (
+          <img src={author.avatar} alt="" className="size-14 shrink-0 rounded-[4px] object-cover" />
+        ) : (
+          <Avatar size={56} />
+        )}
+        <div className="flex flex-col gap-1 font-bold">
+          <p className="text-[20px] leading-8 tracking-[0.03px]">{author.name}</p>
+          <p className="text-[16px] leading-4 tracking-[0.064px] text-[#666]">{author.level}</p>
+        </div>
+      </div>
+      <div className="flex px-4" aria-hidden>
+        <img src="/assets/community/pointer-up.svg" alt="" width={13.6262} height={20.5} className="-my-[3.4px] -rotate-90" />
+      </div>
+    </div>
+  )
+}
+
+// List row pointer (Figma "Polygon 1"): from the card towards the author.
+export function PointerRight() {
+  return <img src="/assets/community/pointer-right.svg" alt="" aria-hidden width={13.6262} height={20.5} className="shrink-0 max-md:hidden" />
 }
 
 export function RedCta({ to, children }: { to: string; children: ReactNode }) {
@@ -98,21 +126,39 @@ export function Pagination({ page, pages, go }: { page: number; pages: number; g
   )
 }
 
-export function ReplyCard({ r }: { r: Reply }) {
-  const [liked, setLiked] = useState(false)
+export function ReplyCard({ r, postId }: { r: Reply; postId: string }) {
   return (
     <li className="flex gap-3">
-      <Avatar size={24} />
+      {r.avatar ? <img src={r.avatar} alt="" referrerPolicy="no-referrer" className="size-6 shrink-0 rounded-[4px] object-cover" /> : <Avatar size={24} />}
       <div className="flex-1 rounded-lg bg-neutral-700 p-3">
         <p className="text-[14px] font-bold">{r.author}</p>
-        <p className="mt-1 text-[16px] leading-[26px]">{r.text}</p>
+        <p className="mt-1 whitespace-pre-wrap break-words text-[16px] leading-[26px]">{r.text}</p>
         <div className="mt-2 flex items-center gap-4 text-[12px] text-neutral-50">
           <span>{r.ago}</span>
-          <button type="button" className="flex items-center gap-1 hover:text-white">
-            <img src="/assets/community/ic-chat.svg" alt="" className="size-3.5" /> {r.replies ? `View ${r.replies} Replies` : 'Reply'}
-          </button>
-          <button type="button" aria-pressed={liked} onClick={() => setLiked((l) => !l)} className={`ml-auto flex items-center gap-1 ${liked ? 'text-secondary-400' : 'hover:text-white'}`}>
-            <img src="/assets/community/ic-thumbs-up.svg" alt="" className="size-3.5" /> {r.likes + (liked ? 1 : 0)}
+          {r.replies > 0 && (
+            <span className="flex items-center gap-1">
+              <img src="/assets/community/ic-chat.svg" alt="" className="size-3.5" /> View {r.replies} Replies
+            </span>
+          )}
+          {r.mine && (
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm('Delete this reply?')) deleteReply(postId, r.id).catch((e) => alert(e.message))
+              }}
+              className="hover:text-red-400"
+            >
+              Delete
+            </button>
+          )}
+          <button
+            type="button"
+            aria-pressed={!!r.likedByMe}
+            aria-label={r.likedByMe ? 'Remove like' : 'Like reply'}
+            onClick={() => toggleReplyLike(postId, r.id)}
+            className={`ml-auto flex items-center gap-1 ${r.likedByMe ? 'font-bold text-secondary-400' : 'hover:text-white'}`}
+          >
+            <img src="/assets/community/ic-thumbs-up.svg" alt="" className="size-3.5" /> {r.likes}
           </button>
         </div>
       </div>

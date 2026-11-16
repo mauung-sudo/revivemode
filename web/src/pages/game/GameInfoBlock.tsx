@@ -67,7 +67,7 @@ export default function GameInfoBlock({ game, showPlay = true }: { game: MockGam
   const info = gameInfo(game)
   const { myGames } = useLibrary()
   const owned = myGames.includes(game.id)
-  const supported = !!systemForPlatform(game.platform)
+  const supported = !!systemForPlatform(game.platform, game.id)
   const meta: [string, string][] = [
     ['Genre', game.genre],
     ['Platform', game.platform],
@@ -143,7 +143,7 @@ export default function GameInfoBlock({ game, showPlay = true }: { game: MockGam
           <h2 className="mb-3 text-[25px] font-bold">Screen shots</h2>
           <div className="no-scrollbar flex gap-4 overflow-x-auto">
             {info.screenshots.map((s) => (
-              <img key={s} src={s} alt="" className="pixelated h-[130px] shrink-0 rounded object-cover" />
+              <img key={s} src={s} alt="" className="pixelated h-[130px] shrink-0 object-cover" />
             ))}
           </div>
         </section>

@@ -3,7 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { SortButton, Toolbar } from '../../components/FilterBar'
 import { refreshPosts, TAGS, usePosts, type Challenge, type Creation, type Discussion, type Section } from '../../data/community'
 import type { SortKey } from '../../lib/gameFilter'
-import { AuthorBadge, GreyCard, Pagination, SectionHeader, Tag } from './shared'
+import { AuthorBadge, GreyCard, Pagination, PointerRight, SectionHeader } from './shared'
 
 const TABS: Record<Section, string[]> = {
   discussions: ['Featured', 'Personalized', 'Your posts'],
@@ -15,35 +15,39 @@ const PER_PAGE = 6
 
 function Stat({ icon, n }: { icon: string; n: number }) {
   return (
-    <span className="flex items-center gap-1 text-[12px]">
-      <img src={icon} alt="" className="size-3.5" /> {n}
+    <span className="flex items-center gap-1 text-[14px] text-[#bbb]">
+      <img src={icon} alt="" width={16} height={16} /> {n}
     </span>
   )
 }
 
+// List rows (Figma "list item"): card, a pointer aimed at the author, then the author.
 function DiscussionRow({ d }: { d: Discussion }) {
   return (
-    <li className="flex items-center gap-4 max-md:flex-col max-md:items-stretch">
-      <Link to={`/community/discussions/${d.id}`} className="flex-1 rounded-lg bg-neutral-700 p-3 shadow-[0_4px_8px_rgba(0,0,0,0.4)] hover:bg-neutral-600">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-[18px] font-bold">{d.title}</h3>
-          <div className="flex shrink-0 gap-3 text-neutral-50">
-            <Stat icon="/assets/community/ic-thumbs-up.svg" n={d.likes} />
-            <Stat icon="/assets/community/ic-chat.svg" n={d.replies.length} />
-            <span className="text-[12px]">👁 {d.views}</span>
+    <li className="flex items-center py-3 max-md:flex-col max-md:items-stretch max-md:gap-2 max-md:py-0">
+      <Link to={`/community/discussions/${d.id}`} className="group flex min-w-0 flex-1 items-center">
+        <div className="flex min-w-0 flex-1 flex-col gap-1 rounded-[8px] bg-neutral-800 px-4 py-2 group-hover:bg-neutral-700">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="truncate text-[20px] font-bold leading-8 tracking-[0.03px]">{d.title}</h3>
+            <div className="flex shrink-0 items-center gap-4">
+              <Stat icon="/assets/community/list-thumbs-up.svg" n={d.likes} />
+              <Stat icon="/assets/community/list-chat.svg" n={d.replies.length} />
+              <Stat icon="/assets/community/ic-eye.svg" n={d.views} />
+            </div>
+          </div>
+          <div className="flex items-start justify-between gap-3 text-[14px] text-[#d1d1d1]">
+            <div className="flex flex-wrap gap-2">
+              {d.tags.map((t) => (
+                <span key={t}>#{t}</span>
+              ))}
+            </div>
+            <span className="shrink-0">{d.date}</span>
           </div>
         </div>
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            {d.tags.map((t) => (
-              <Tag key={t}>{t}</Tag>
-            ))}
-          </div>
-          <span className="shrink-0 text-[12px] text-neutral-50">{d.date}</span>
-        </div>
+        <PointerRight />
       </Link>
-      <div className="w-[160px] shrink-0">
-        <AuthorBadge author={d.author} size={32} />
+      <div className="w-[176px] shrink-0 p-2 max-md:w-auto max-md:p-0">
+        <AuthorBadge author={d.author} size={40} />
       </div>
     </li>
   )
@@ -51,21 +55,24 @@ function DiscussionRow({ d }: { d: Discussion }) {
 
 function ChallengeRow({ c }: { c: Challenge }) {
   return (
-    <li className="flex items-start gap-4 max-md:flex-col max-md:items-stretch">
-      <Link to={`/community/challenges/${c.id}`} className="flex-1 rounded-lg bg-neutral-700 p-3 shadow-[0_4px_8px_rgba(0,0,0,0.4)] hover:bg-neutral-600">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[18px] font-bold">{c.title}</h3>
-          <Difficulty d={c.difficulty} />
+    <li className="flex items-center py-3 max-md:flex-col max-md:items-stretch max-md:gap-2 max-md:py-0">
+      <Link to={`/community/challenges/${c.id}`} className="group flex min-w-0 flex-1 items-center">
+        <div className="min-w-0 flex-1 rounded-[8px] bg-neutral-800 px-4 py-2 group-hover:bg-neutral-700">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[20px] font-bold leading-8">{c.title}</h3>
+            <Difficulty d={c.difficulty} />
+          </div>
+          <p className="mt-1 text-[14px] font-bold text-neutral-50">{c.game}</p>
+          <div className="flex justify-between text-[14px] text-[#d1d1d1]">
+            <span>{c.competitors} competitors</span>
+            <span>{c.date}</span>
+          </div>
+          <Reward c={c} />
         </div>
-        <p className="mt-1 text-[14px] font-bold text-neutral-50">{c.game}</p>
-        <div className="flex justify-between text-[12px] text-neutral-50">
-          <span>{c.competitors} competitors</span>
-          <span>{c.date}</span>
-        </div>
-        <Reward c={c} />
+        <PointerRight />
       </Link>
-      <div className="w-[160px] shrink-0">
-        <AuthorBadge author={c.author} size={32} />
+      <div className="w-[176px] shrink-0 p-2 max-md:w-auto max-md:p-0">
+        <AuthorBadge author={c.author} size={40} />
       </div>
     </li>
   )
@@ -153,29 +160,41 @@ export default function CommunityList() {
     <div className="min-h-[70vh] bg-[#262626] bg-[radial-gradient(#353535_1px,transparent_1px)] [background-size:12px_12px]">
       <div className="mx-auto flex max-w-[1024px] flex-col gap-4 px-4 py-8 lg:px-0">
         <SectionHeader section={section} cta />
-        <div role="tablist" className="no-scrollbar flex gap-4 overflow-x-auto">
-          {TABS[section].map((t, i) => (
-            <button
-              key={t}
-              role="tab"
-              aria-selected={tab === i}
-              onClick={() => {
-                setTab(i)
-                reset()
-              }}
-              className={`shrink-0 px-3 py-2 text-[25px] font-bold max-md:text-[18px] ${tab === i ? 'text-secondary-400' : 'text-[#d1d1d1] hover:text-white'}`}
-            >
-              {t}
-            </button>
-          ))}
+        {/* Tabs; on Creations the search sits on the same line (Figma 64:4049). */}
+        <div className="flex items-center gap-4 pb-2 max-md:flex-col max-md:items-stretch">
+          <div role="tablist" className="no-scrollbar flex min-w-0 flex-1 items-center overflow-x-auto">
+            {TABS[section].map((t, i) => (
+              <button
+                key={t}
+                role="tab"
+                aria-selected={tab === i}
+                onClick={() => {
+                  setTab(i)
+                  reset()
+                }}
+                className={`shrink-0 py-3 text-[25px] font-bold leading-10 max-md:text-[18px] ${i === 0 ? 'pr-6' : 'px-6'} ${
+                  tab === i ? 'bg-gradient-to-t from-[#b1f2d7] from-[32.5%] to-white to-[130%] bg-clip-text text-transparent' : 'text-[#d1d1d1] hover:text-white'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          {section === 'creations' && (
+            <label className="flex min-w-[92px] max-w-[300px] flex-1 items-center gap-2.5 rounded-[8px] border border-neutral-400 px-4 py-3 max-md:max-w-none">
+              <img src="/assets/ui/search-zoom.png" alt="" className="size-6 object-cover" />
+              <input
+                value={q}
+                onChange={(e) => (setQ(e.target.value), reset())}
+                placeholder={SEARCH[section]}
+                aria-label={SEARCH[section]}
+                className="min-w-0 flex-1 truncate bg-transparent font-pixel text-[20px] leading-[18px] tracking-[1px] placeholder:text-white focus:outline-none"
+              />
+            </label>
+          )}
         </div>
 
-        {section === 'creations' ? (
-          <label className="ml-auto flex w-[300px] max-w-full items-center gap-2 rounded-lg border border-neutral-400 px-3 py-2.5 font-pixel text-[18px]">
-            <img src="/assets/ui/search.png" alt="" className="size-5" />
-            <input value={q} onChange={(e) => (setQ(e.target.value), reset())} placeholder={SEARCH[section]} className="min-w-0 flex-1 bg-transparent placeholder:text-white focus:outline-none" />
-          </label>
-        ) : (
+        {section !== 'creations' && (
           <>
             <Toolbar>
               <SortButton sort={sort} onChange={setSort} />

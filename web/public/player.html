@@ -51,6 +51,8 @@
         window.EJS_onGameStart = () => {
           setTimeout(applySettings, 0)
           startAchievements()
+          if (params.get('cloud') === '1') useCloudSaves()
+          parent.postMessage({ type: 'revivemode:started' }, location.origin)
         }
         const s = document.createElement('script')
         s.src = EJS_CDN + 'loader.js'
@@ -265,6 +267,66 @@
           setTimeout(() => el.remove(), 400)
         }, 5000)
       }
+
+      // ---------------------------------------------------------------
+      // With ?cloud=1 (signed in), the emulator's own Save State / Load State
+      // buttons go to the account's cloud slot instead of this browser: the
+      // site does the upload/download and answers with a short notice.
+      function useCloudSaves() {
+        const emu = window.EJS_emulator
+        emu.on('saveState', ({ state }) => {
+          const copy = new Uint8Array(state)
+          parent.postMessage({ type: 'revivemode:cloudSave', state: copy }, location.origin, [copy.buffer])
+        })
+        emu.on('loadState', () => parent.postMessage({ type: 'revivemode:cloudLoad' }, location.origin))
+      }
+
+      function showNotice(text, error) {
+        const el = document.createElement('div')
+        el.className = 'rm-toast'
+        el.setAttribute('role', 'status')
+        el.style.borderColor = error ? '#e53201' : '#74e7b7'
+        el.innerHTML = '<div class="rm-toast-desc" style="padding-left:6px;color:#fff"></div>'
+        el.firstChild.textContent = text
+        document.body.appendChild(el)
+        requestAnimationFrame(() => el.classList.add('rm-toast-in'))
+        setTimeout(() => {
+          el.classList.remove('rm-toast-in')
+          setTimeout(() => el.remove(), 400)
+        }, 2500)
+      }
+
+      // ---------------------------------------------------------------
+      // Cloud saves (lib/cloudSaves.ts). The site asks for the current
+      // save state or hands one back to load; same origin only.
+      window.addEventListener('message', (e) => {
+        if (e.origin !== location.origin || e.source !== parent) return
+        const { type, id, state } = e.data || {}
+        if (type === 'revivemode:notice') return showNotice(String(e.data.text || ''), !!e.data.error)
+        if (type !== 'revivemode:getState' && type !== 'revivemode:loadState') return
+        const reply = (data) => parent.postMessage({ id, ...data }, location.origin)
+        const emu = window.EJS_emulator
+        const gm = emu && emu.gameManager
+        if (!gm || !emu.started) return reply({ error: 'Start the game first.' })
+        if (gm.supportsStates && !gm.supportsStates()) return reply({ error: 'This system does not support save states.' })
+        try {
+          if (type === 'revivemode:getState') {
+            const s = gm.getState()
+            const copy = new Uint8Array(s) // the core reuses its buffer
+            parent.postMessage({ id, state: copy }, location.origin, [copy.buffer])
+          } else {
+            if (!(state instanceof Uint8Array)) return reply({ error: 'Bad save file.' })
+            // States for one core and game are a fixed size; a different size
+            // means another game, another ROM version or a broken file, which
+            // the core would silently ignore.
+            if (state.length !== gm.getState().length) return reply({ error: "That save doesn't match this game or ROM version." })
+            gm.loadState(state)
+            reply({ ok: true })
+          }
+        } catch (err) {
+          reply({ error: 'The emulator could not ' + (type === 'revivemode:getState' ? 'save' : 'load') + ' that state.' })
+        }
+      })
 
       document.addEventListener('visibilitychange', () => {
         const emu = window.EJS_emulator

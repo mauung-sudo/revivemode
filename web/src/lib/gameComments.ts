@@ -59,7 +59,7 @@ function entry(gameId: string, title = ''): Entry {
     const samples = SAMPLE_COMMENTS(title).map<GameComment>((c) => ({
       id: `sample-${c.id}`,
       user: c.user,
-      avatar: null,
+      avatar: '/assets/game/comments/avatar-sample.png', // design's sample avatar
       text: c.text,
       ago: c.ago,
       likes: c.likes,
